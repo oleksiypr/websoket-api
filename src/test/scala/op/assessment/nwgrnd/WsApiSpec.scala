@@ -13,8 +13,6 @@ import spray.json._
 class WsApiSpec extends WordSpec with Matchers
     with Directives with ScalatestRouteTest with WsApi {
 
-  import DefaultJsonProtocol._
-
   "WsApi" in {
     val wsClient = WSProbe()
 
@@ -31,11 +29,7 @@ class WsApiSpec extends WordSpec with Matchers
         )
 
         wsClient.expectMessage(
-          """
-            |{
-            | "$type": "login_failed"
-            |}
-          """.stripMargin
+          """{"$type":"login_failed"}"""
         )*/
 
         wsClient.sendMessage(

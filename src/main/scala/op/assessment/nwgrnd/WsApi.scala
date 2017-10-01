@@ -2,12 +2,13 @@ package op.assessment.nwgrnd
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.{ Unmarshal, Unmarshaller }
 import akka.stream.{ ActorMaterializer, Materializer }
 import akka.stream.scaladsl.Flow
-import op.assessment.nwgrnd.WsApi.{ ClientContext, Login, LoginSuccessful }
+import op.assessment.nwgrnd.WsApi._
 import spray.json._
 
 import scala.concurrent.{ ExecutionContext, Future }
@@ -21,9 +22,12 @@ object WsApi {
     def unapply(arg: ClientContext): Option[String] = arg.userName
   }
 
-  case class Login(name: String, pass: String)
-  case object LoginFailed
-  case class LoginSuccessful(userType: String)
+  abstract class Incoming(val $type: String)
+  case class Login(name: String, pass: String) extends Incoming("login")
+
+  trait Outcoming
+  case object LoginFailed extends Outcoming
+  case class LoginSuccessful(userType: String) extends Outcoming
 }
 
 trait JsonSupport extends SprayJsonSupport {
@@ -33,14 +37,21 @@ trait JsonSupport extends SprayJsonSupport {
   implicit val loginFormat = jsonFormat(Login, "username", "password")
   implicit val loginSuccessful = jsonFormat(LoginSuccessful, "user_type")
 
-  def parse(in: String): Future[Login] = {
+  def unmarshal(in: String): Login = {
     val json = in.parseJson.asJsObject
     val payload = JsObject(json.fields - "$type")
     json.fields("$type").convertTo[String].toLowerCase match {
-      case "login" => Unmarshal(payload.compactPrint).to[Login]
+      case "login" => payload.convertTo[Login]
     }
   } //Unmarshal(rsp.entity).to[T]//in.parseJson.convertTo[Login]
 
+  def marshal(out: Outcoming): String = out match {
+    case LoginFailed =>
+      JsObject("$type" -> JsString("login_failed")).compactPrint
+    case out: LoginSuccessful =>
+      val $type = JsObject("$type" -> JsString("login_successful"))
+      JsObject($type.fields ++ out.toJson.asJsObject.fields).compactPrint
+  }
 }
 
 trait WsApi extends JsonSupport {
@@ -63,7 +74,7 @@ trait WsApi extends JsonSupport {
       .collect {
         case tm: TextMessage ⇒ tm.textStream
       }
-      .mapAsync(2)(in => in.runFold("")(_ + _).flatMap(parse))
+      .mapAsync(2)(in => in.runFold("")(_ + _).map(unmarshal))
       .statefulMapConcat(() ⇒ {
         val context = new ClientContext
         m: Login ⇒ (context → m) :: Nil
@@ -78,10 +89,5 @@ trait WsApi extends JsonSupport {
       .collect {
         case (ClientContext(userName), Login(_, _)) ⇒ LoginSuccessful("admin")
       }
-      .mapAsync(2)(out ⇒ Future(TextMessage({
-        val $type = JsObject("$type" -> JsString("login_successful"))
-        val json = out.toJson.asJsObject
-        val typed = $type.fields ++ json.fields
-        JsObject(typed).compactPrint
-      })))
+      .map(out => TextMessage(marshal(out)))
 }

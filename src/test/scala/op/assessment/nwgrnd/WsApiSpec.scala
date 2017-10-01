@@ -1,35 +1,54 @@
 package op.assessment.nwgrnd
 
-import scala.concurrent.duration._
-import akka.util.ByteString
-import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.{ Flow, Sink, Source }
-import akka.http.scaladsl.model.ws.{ BinaryMessage, Message, TextMessage }
+import akka.http.scaladsl.model.ws.BinaryMessage
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
+import akka.util.ByteString
 import org.scalatest.{ Matchers, WordSpec }
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import spray.json._
 
 class WsApiSpec extends WordSpec with Matchers
     with Directives with ScalatestRouteTest with WsApi {
 
+  import DefaultJsonProtocol._
+
   "WsApi" in {
     val wsClient = WSProbe()
 
-    // WS creates a WebSocket request for testing
-    WS("/greeter", wsClient.flow) ~> route ~>
+    WS("/ws-api", wsClient.flow) ~> route ~>
       check {
-        // check response for WS Upgrade headers
         isWebSocketUpgrade shouldEqual true
 
-        // manually run a WS conversation
-        wsClient.sendMessage("Peter")
-        wsClient.expectMessage("Hello Peter!")
+        /*        wsClient.sendMessage(
+          """{
+            | "$type":"login",
+            | "username":"user1234",
+            | "password":"password12345"
+            |}""".stripMargin
+        )
 
-        wsClient.sendMessage(BinaryMessage(ByteString("abcdef")))
-        wsClient.expectNoMessage(100.millis)
+        wsClient.expectMessage(
+          """
+            |{
+            | "$type": "login_failed"
+            |}
+          """.stripMargin
+        )*/
 
-        wsClient.sendMessage("John")
-        wsClient.expectMessage("Hello John!")
+        wsClient.sendMessage(
+          """{
+            | "$type":"login",
+            | "username":"user1234",
+            | "password":"password1234"
+            }""".stripMargin
+        )
+
+        wsClient.expectMessage(
+          """{"$type":"login_successful","user_type":"admin"}"""
+        )
 
         wsClient.sendCompletion()
         wsClient.expectCompletion()

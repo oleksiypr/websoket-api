@@ -6,16 +6,18 @@ import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Flow
 import akka.stream.{ ActorMaterializer, Materializer }
+import op.assessment.nwgrnd.WsApi.ClientContext.Auth
 import op.assessment.nwgrnd.WsApi._
 import spray.json._
 
 object WsApi {
   class ClientContext {
-    @volatile var userName: Option[String] = None
+    @volatile var auth: Option[Auth] = None
   }
 
   object ClientContext {
-    def unapply(arg: ClientContext): Option[String] = arg.userName
+    def unapply(arg: ClientContext): Option[Auth] = arg.auth
+    case class Auth(userName: String, role: String)
   }
 
   abstract class Incoming(val $type: String)
@@ -71,8 +73,12 @@ trait WsApi extends JsonSupport {
     handleWebSocketMessages(authHandler)
   }
 
-  def auth(name: String, password: String): Boolean = {
-    name == "user1234" && password == "password1234"
+  def auth(name: String, password: String): Option[Auth] = {
+    (name, password) match {
+      case ("user", "password-user") => Some(Auth(name, "user"))
+      case ("admin", "password-admin") => Some(Auth(name, "admin"))
+      case _ => None
+    }
   }
 
   def authHandler: Flow[Message, Message, Any] =
@@ -86,17 +92,16 @@ trait WsApi extends JsonSupport {
         m ⇒ (context → m) :: Nil
       })
       .mapConcat {
-        case m @ (c: ClientContext, Login(name, pass)) if auth(name, pass) =>
-          c.userName = Some(name)
+        case m @ (c: ClientContext, Login(name, pass)) =>
+          c.auth = auth(name, pass)
           m :: Nil
         case m @ (_: ClientContext, _) => m :: Nil
 
       }
       .collect {
-        case (ClientContext(userName), Login(_, _)) ⇒ LoginSuccessful("admin")
+        case (ClientContext(auth), Login(_, _)) ⇒ LoginSuccessful(auth.role)
         case (_: ClientContext, Login(_, _)) => LoginFailed
-        case (c: ClientContext, Ping(seq)) if c.userName.nonEmpty => Pong(seq)
-        case (c: ClientContext, Ping(_)) => LoginFailed
+        case (c: ClientContext, Ping(seq)) if c.auth.nonEmpty => Pong(seq)
       }
       .map(out => TextMessage(marshal(out)))
 }

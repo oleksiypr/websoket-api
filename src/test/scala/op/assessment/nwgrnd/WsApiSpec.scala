@@ -29,13 +29,13 @@ class WsApiSpec extends WordSpec with Matchers
         wsClient.sendMessage(
           """{
             | "$type":"login",
-            | "username":"user1234",
-            | "password":"password1234"
+            | "username":"user",
+            | "password":"password-user"
             }""".stripMargin
         )
 
         wsClient.expectMessage(
-          """{"$type":"login_successful","user_type":"admin"}"""
+          """{"$type":"login_successful","user_type":"user"}"""
         )
 
         wsClient.sendMessage(

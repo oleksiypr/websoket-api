@@ -31,11 +31,13 @@ object WsApi {
 trait JsonSupport extends SprayJsonSupport {
   import DefaultJsonProtocol._
 
+  type Format[T] = RootJsonFormat[T]
+
   implicit val materializer: Materializer
-  implicit val loginFormat = jsonFormat(Login, "username", "password")
-  implicit val loginSuccessfulFormat = jsonFormat(LoginSuccessful, "user_type")
-  implicit val pingFormat = jsonFormat(Ping, "seq")
-  implicit val pongFormat = jsonFormat(Pong, "seq")
+  implicit val loginFormat: Format[Login] = jsonFormat(Login, "username", "password")
+  implicit val loginSuccessfulFormat: Format[LoginSuccessful] = jsonFormat(LoginSuccessful, "user_type")
+  implicit val pingFormat: Format[Ping] = jsonFormat(Ping, "seq")
+  implicit val pongFormat: Format[Pong] = jsonFormat(Pong, "seq")
 
   def unmarshal(in: String): Incoming = {
     val json = in.parseJson.asJsObject
@@ -94,7 +96,7 @@ trait WsApi extends JsonSupport {
         case (ClientContext(userName), Login(_, _)) ⇒ LoginSuccessful("admin")
         case (_: ClientContext, Login(_, _)) => LoginFailed
         case (c: ClientContext, Ping(seq)) if c.userName.nonEmpty => Pong(seq)
-        case (c: ClientContext, Ping(seq)) => LoginFailed
+        case (c: ClientContext, Ping(_)) => LoginFailed
       }
       .map(out => TextMessage(marshal(out)))
 }

@@ -36,6 +36,8 @@ trait JsonSupport extends SprayJsonSupport {
   type Format[T] = RootJsonFormat[T]
 
   implicit val materializer: Materializer
+
+  implicit val loginFailedWriter: JsonWriter[LoginFailed.type] = _ => JsObject.empty
   implicit val loginFormat: Format[Login] = jsonFormat(Login, "username", "password")
   implicit val loginSuccessfulFormat: Format[LoginSuccessful] = jsonFormat(LoginSuccessful, "user_type")
   implicit val pingFormat: Format[Ping] = jsonFormat(Ping, "seq")
@@ -51,14 +53,16 @@ trait JsonSupport extends SprayJsonSupport {
   }
 
   def marshal(out: Outcoming): String = out match {
-    case LoginFailed =>
-      JsObject("$type" -> JsString("login_failed")).compactPrint
-    case out: LoginSuccessful =>
-      val $type = JsObject("$type" -> JsString("login_successful"))
-      JsObject($type.fields ++ out.toJson.asJsObject.fields).compactPrint
-    case out: Pong =>
-      val $type = JsObject("$type" -> JsString("pong"))
-      JsObject($type.fields ++ out.toJson.asJsObject.fields).compactPrint
+    case out: LoginFailed.type => marshal(out, "login_failed")
+    case out: LoginSuccessful => marshal(out, "login_successful")
+    case out: Pong => marshal(out, "pong")
+  }
+
+  def marshal[T <: Outcoming: JsonWriter](out: T, $type: String): String = {
+    JsObject(
+      JsObject("$type" -> JsString($type)).fields ++
+        out.toJson.asJsObject.fields
+    ).compactPrint
   }
 }
 

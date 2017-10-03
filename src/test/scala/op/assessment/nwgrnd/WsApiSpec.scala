@@ -7,7 +7,7 @@ import org.scalatest.{ Matchers, WordSpec }
 class WsApiSpec extends WordSpec with Matchers
     with Directives with ScalatestRouteTest with WsApi {
 
-  "WsApi" in {
+  "WsApi ping-pong" in {
     val wsClient = WSProbe()
 
     WS("/ws-api", wsClient.flow) ~> route ~>

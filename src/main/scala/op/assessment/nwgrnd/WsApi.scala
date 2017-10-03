@@ -1,14 +1,12 @@
 package op.assessment.nwgrnd
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.ws.{ Message, TextMessage }
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Flow
-import akka.stream.{ ActorMaterializer, Materializer }
 import op.assessment.nwgrnd.WsApi.ClientContext.Auth
 import op.assessment.nwgrnd.WsApi._
-import spray.json._
 
 object WsApi {
   class ClientContext {

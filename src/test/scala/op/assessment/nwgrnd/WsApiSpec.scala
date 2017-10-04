@@ -4,7 +4,7 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
-import akka.testkit.TestProbe
+import akka.testkit.{ TestActor, TestProbe }
 import org.scalatest.{ Matchers, WordSpec }
 
 class WsApiSpec extends WordSpec with Matchers
@@ -70,6 +70,19 @@ class WsApiSpec extends WordSpec with Matchers
       probe.send(source, TextMessage.Strict("subscribed"))
 
       wsClient.expectMessage("subscribed")
+
+      probe.setAutoPilot(
+        (_: ActorRef, msg: Any) => msg match {
+          case "update" =>
+            probe.send(source, TextMessage.Strict("updated"))
+            TestActor.KeepRunning
+          case 'sinkclose => TestActor.NoAutoPilot
+        }
+      )
+
+      tables ! "update"
+
+      wsClient.expectMessage("updated")
 
       wsClient.sendCompletion()
       system.stop(source)

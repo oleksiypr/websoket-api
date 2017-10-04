@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
 import akka.testkit.{ TestActor, TestProbe }
+import op.assessment.nwgrnd.WsApi.Tables
 import org.scalatest.{ Matchers, WordSpec }
 
 class WsApiSpec extends WordSpec with Matchers
@@ -61,20 +62,41 @@ class WsApiSpec extends WordSpec with Matchers
   "WsApi subscribe" in {
     val wsClient = WSProbe()
 
-    WS("/ws-api/subscribe", wsClient.flow) ~> route ~> check {
+    WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
+
+      wsClient.sendMessage(
+        """{
+          | "$type":"login",
+          | "username":"user",
+          | "password":"password-user"
+          }""".stripMargin
+      )
+
+      wsClient.expectMessage(
+        """{"$type":"login_successful","user_type":"user"}"""
+      )
+
+      wsClient.sendMessage(
+        """{
+          | "$type": "subscribe_tables"
+          |}
+        """.stripMargin
+      )
 
       val source = probe.expectMsgPF() {
         case ('income, source: ActorRef) => source
       }
-      probe.send(source, TextMessage.Strict("subscribed"))
+      wsClient.expectMessage("""{"$type":"table_list"}""")
 
-      wsClient.expectMessage("subscribed")
+      //TODO: handle this scenario
+      //probe.send(source, TextMessage.Strict("subscribed"))
+      //wsClient.expectMessage("subscribed")
 
       probe.setAutoPilot(
         (_: ActorRef, msg: Any) => msg match {
           case "update" =>
-            probe.send(source, TextMessage.Strict("updated"))
+            probe.send(source, Tables)
             TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
         }
@@ -82,7 +104,7 @@ class WsApiSpec extends WordSpec with Matchers
 
       tables ! "update"
 
-      wsClient.expectMessage("updated")
+      wsClient.expectMessage("""{"$type":"table_list"}""")
 
       wsClient.sendCompletion()
       system.stop(source)

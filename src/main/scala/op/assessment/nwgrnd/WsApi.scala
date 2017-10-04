@@ -1,5 +1,6 @@
 package op.assessment.nwgrnd
 
+import akka.NotUsed
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
@@ -22,11 +23,13 @@ object WsApi {
   abstract class Incoming(val $type: String)
   case class Login(name: String, pass: String) extends Incoming("login")
   case class Ping(seq: Int) extends Incoming("ping")
+  case object Subscribe extends Incoming("subscribe_tables")
 
   trait Outcoming
   case object LoginFailed extends Outcoming
   case class LoginSuccessful(userType: String) extends Outcoming
   case class Pong(seq: Int) extends Outcoming
+  case object Tables extends Outcoming
 }
 
 trait WsApi extends JsonSupport {
@@ -54,6 +57,14 @@ trait WsApi extends JsonSupport {
     }
   }
 
+  def tablesSink: Sink[Any, NotUsed] = Sink.actorRef(tables, 'sinkclose)
+  def subscription: Source[Nothing, ActorRef] =
+    Source.actorRef(8, OverflowStrategy.fail)
+      .mapMaterializedValue { sourceActor ⇒
+        tables ! ('income → sourceActor)
+        sourceActor
+      }
+
   def handler: Flow[Message, Message, Any] =
     Flow[Message]
       .collect {
@@ -75,7 +86,10 @@ trait WsApi extends JsonSupport {
         case (ClientContext(auth), Login(_, _)) ⇒ LoginSuccessful(auth.role)
         case (_: ClientContext, Login(_, _)) => LoginFailed
         case (c: ClientContext, Ping(seq)) if c.auth.nonEmpty => Pong(seq)
+        case (ClientContext(_), Subscribe) => Tables
       }
+      .alsoTo(tablesSink)
+      .merge(subscription)
       .map(out => TextMessage(marshal(out)))
 
   def subscribeHandler: Flow[Message, Message, Any] = {

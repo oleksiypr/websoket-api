@@ -1,14 +1,15 @@
 package op.assessment.nwgrnd
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.actor.{ ActorRef, ActorSystem }
+import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
-import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Flow
+import akka.stream.{ ActorMaterializer, OverflowStrategy }
+import akka.stream.scaladsl.{ Flow, Sink, Source }
 import op.assessment.nwgrnd.WsApi.ClientContext.Auth
 import op.assessment.nwgrnd.WsApi._
 
 object WsApi {
+
   class ClientContext {
     @volatile var auth: Option[Auth] = None
   }
@@ -35,9 +36,15 @@ trait WsApi extends JsonSupport {
   implicit val materializer: ActorMaterializer
   import system.dispatcher
 
-  val route: Route = path("ws-api") {
-    handleWebSocketMessages(authHandler)
-  }
+  val tables: ActorRef
+
+  val route: Route =
+    path("ws-api") {
+      handleWebSocketMessages(handler)
+    } ~
+      path("ws-api" / "subscribe") {
+        handleWebSocketMessages(subscribeHandler)
+      }
 
   def auth(name: String, password: String): Option[Auth] = {
     (name, password) match {
@@ -47,7 +54,7 @@ trait WsApi extends JsonSupport {
     }
   }
 
-  def authHandler: Flow[Message, Message, Any] =
+  def handler: Flow[Message, Message, Any] =
     Flow[Message]
       .collect {
         case tm: TextMessage ⇒ tm.textStream
@@ -70,4 +77,14 @@ trait WsApi extends JsonSupport {
         case (c: ClientContext, Ping(seq)) if c.auth.nonEmpty => Pong(seq)
       }
       .map(out => TextMessage(marshal(out)))
+
+  def subscribeHandler: Flow[Message, Message, Any] = {
+    val in = Sink.actorRef(tables, 'sinkclose)
+    val out = Source.actorRef(8, OverflowStrategy.fail)
+      .mapMaterializedValue { sourceActor ⇒
+        tables ! ('income → sourceActor)
+        sourceActor
+      }
+    Flow.fromSinkAndSource(in, out)
+  }
 }

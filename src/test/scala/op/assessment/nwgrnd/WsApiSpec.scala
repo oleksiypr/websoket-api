@@ -1,24 +1,29 @@
 package op.assessment.nwgrnd
 
-import akka.actor.ActorRef
-import akka.http.scaladsl.model.ws.TextMessage
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.server.Directives
-import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
-import akka.testkit.{ TestActor, TestProbe }
+import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
+import akka.stream.ActorMaterializer
+import akka.testkit.{TestActor, TestProbe}
 import op.assessment.nwgrnd.WsApi.Tables
-import org.scalatest.{ Matchers, WordSpec }
+import org.scalatest.{Matchers, WordSpec}
 
 class WsApiSpec extends WordSpec with Matchers
-    with Directives with ScalatestRouteTest with WsApi {
+    with Directives with ScalatestRouteTest { self =>
 
-  val probe = TestProbe()
-  val tables: ActorRef = probe.ref
+  "WsApi ping-pong" in new WsApi {
+    implicit val system: ActorSystem = self.system
+    implicit val materializer: ActorMaterializer = self.materializer
 
-  "WsApi ping-pong" in {
+    val probe = TestProbe()
+    val tables: ActorRef = probe.ref
     val wsClient = WSProbe()
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
+      val source = probe.expectMsgPF() {
+        case ('income, source: ActorRef) => source
+      }
 
       wsClient.sendMessage(
         """{
@@ -55,11 +60,17 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.expectMessage("""{"$type":"pong","seq":1}""")
 
       wsClient.sendCompletion()
+      system.stop(source)
       wsClient.expectCompletion()
     }
   }
 
-  "WsApi subscribe" in {
+  "WsApi subscribe" in new WsApi {
+    implicit val system: ActorSystem = self.system
+    implicit val materializer: ActorMaterializer = self.materializer
+
+    val probe = TestProbe()
+    val tables: ActorRef = probe.ref
     val wsClient = WSProbe()
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
@@ -99,11 +110,24 @@ class WsApiSpec extends WordSpec with Matchers
             probe.send(source, Tables)
             TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
+          case x => println("!!!" + x); TestActor.KeepRunning
         }
       )
 
       tables ! "update"
+      wsClient.expectMessage("""{"$type":"table_list"}""")
 
+      wsClient.sendMessage(
+        """{
+          | "$type": "ping",
+          | "seq": 1
+          |}
+        """.stripMargin
+      )
+
+      wsClient.expectMessage("""{"$type":"pong","seq":1}""")
+
+      tables ! "update"
       wsClient.expectMessage("""{"$type":"table_list"}""")
 
       wsClient.sendCompletion()

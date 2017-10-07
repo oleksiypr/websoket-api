@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
 import akka.stream.ActorMaterializer
 import akka.testkit.{ TestActor, TestProbe }
-import op.assessment.nwgrnd.WsApi.Tables
+import op.assessment.nwgrnd.WsApi.{ Subscribe, Table, Tables }
 import org.scalatest.{ Matchers, WordSpec }
 import spray.json._
 
@@ -111,9 +111,16 @@ class WsApiSpec extends WordSpec with Matchers
       }
       probe.setAutoPilot(
         (_: ActorRef, msg: Any) => msg match {
-          case "update" =>
-            probe.send(source, Tables)
+          case Subscribe =>
+            probe.send(source, Tables(
+              List(
+                Table(id = 1, "table -James Bond", 7),
+                Table(id = 2, "table -Mission Impossible", 4)
+              )
+            ))
             TestActor.KeepRunning
+          case "update" =>
+            probe.send(source, Tables(Nil)); TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case x => println("!!!" + x); TestActor.KeepRunning
         }
@@ -127,7 +134,7 @@ class WsApiSpec extends WordSpec with Matchers
           }""".stripMargin
       )
 
-      wsClient.expectMessage(
+      wsClient.expectJsonStr(
         """{"$type":"login_successful","user_type":"user"}"""
       )
 
@@ -138,14 +145,28 @@ class WsApiSpec extends WordSpec with Matchers
         """.stripMargin
       )
 
-      wsClient.expectMessage("""{"$type":"table_list"}""")
-
-      //TODO: handle this scenario
-      //probe.send(source, TextMessage.Strict("subscribed"))
-      //wsClient.expectMessage("subscribed")
+      wsClient.expectJsonStr(
+        """{
+          |"$type": "table_list",
+          | "tables": [
+          |   {
+          |     "id": 1,
+          |     "name": "table -James Bond",
+          |     "participants": 7
+          |   },
+          |   {
+          |     "id": 2,
+          |     "name": "table -Mission Impossible",
+          |     "participants": 4
+          |   }
+          | ]
+          |}"""
+      )
 
       tablesRepo ! "update"
-      wsClient.expectMessage("""{"$type":"table_list"}""")
+      wsClient.expectJsonStr(
+        """{"$type":"table_list","tables":[]}""".stripMargin
+      )
 
       wsClient.sendCompletion()
       system.stop(source)

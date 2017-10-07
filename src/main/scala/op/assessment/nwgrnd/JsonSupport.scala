@@ -17,7 +17,8 @@ trait JsonSupport extends SprayJsonSupport {
   implicit val pingFormat: Format[Ping] = jsonFormat(Ping, "seq")
   implicit val pongFormat: Format[Pong] = jsonFormat(Pong, "seq")
   implicit val loginFailedWriter: JsonWriter[LoginFailed.type] = _ => JsObject.empty
-  implicit val tablesWriter: JsonWriter[Tables.type] = _ => JsObject.empty
+  implicit val tableFormat: Format[Table] = jsonFormat(Table, "id", "name", "participants")
+  implicit val tablesFormat: Format[Tables] = jsonFormat(Tables, "tables")
 
   def unmarshal(in: String): Incoming = {
     val json = in.parseJson.asJsObject
@@ -33,7 +34,7 @@ trait JsonSupport extends SprayJsonSupport {
     case out: LoginFailed.type => marshal(out, "login_failed")
     case out: LoginSuccessful => marshal(out, "login_successful")
     case out: Pong => marshal(out, "pong")
-    case out: Tables.type => marshal(out, "table_list")
+    case out: Tables => marshal(out, "table_list")
   }
 
   def marshal[T <: Outcoming: JsonWriter](out: T, $type: String): String = {

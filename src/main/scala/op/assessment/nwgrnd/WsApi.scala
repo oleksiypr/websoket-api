@@ -29,7 +29,8 @@ object WsApi {
   case object LoginFailed extends Outcoming
   case class LoginSuccessful(userType: String) extends Outcoming
   case class Pong(seq: Int) extends Outcoming
-  case object Tables extends Outcoming
+  case class Table(id: Int, name: String, participants: Int) extends Outcoming
+  case class Tables(tables: List[Table]) extends Outcoming
 }
 
 trait WsApi extends JsonSupport {
@@ -54,7 +55,12 @@ trait WsApi extends JsonSupport {
     }
   }
 
-  def tables: Sink[Any, NotUsed] = Sink.actorRef(tablesRepo, 'sinkclose)
+  def tables: Sink[(ClientContext, Incoming), NotUsed] = {
+    Flow[(ClientContext, Incoming)].collect {
+      case (ClientContext(_), Subscribe) => Subscribe
+    }.to(Sink.actorRef(tablesRepo, 'sinkclose))
+  }
+
   def subscription: Source[Nothing, ActorRef] =
     Source.actorRef(8, OverflowStrategy.fail)
       .mapMaterializedValue { sourceActor ⇒
@@ -79,13 +85,12 @@ trait WsApi extends JsonSupport {
         case m @ (_: ClientContext, _) => m :: Nil
 
       }
+      .alsoTo(tables)
       .collect {
         case (ClientContext(auth), Login(_, _)) ⇒ LoginSuccessful(auth.role)
         case (_: ClientContext, Login(_, _)) => LoginFailed
         case (c: ClientContext, Ping(seq)) if c.auth.nonEmpty => Pong(seq)
-        case (ClientContext(_), Subscribe) => Tables
       }
-      .alsoTo(tables)
       .merge(subscription)
       .map(out => TextMessage(marshal(out)))
 }

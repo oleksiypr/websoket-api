@@ -10,8 +10,27 @@ import op.assessment.nwgrnd.WsApi.Tables
 import org.scalatest.{ Matchers, WordSpec }
 import spray.json._
 
+object WsApiSpec {
+
+  implicit class WsClientOps(val probe: WSProbe) extends AnyVal {
+    def expectJsonStr(json: String)(implicit matchers: Matchers) {
+      import matchers._
+      probe.expectMessage() match {
+        case TextMessage.Strict(msg) =>
+          msg.parseJson.asJsObject should be {
+            json.stripMargin.parseJson.asJsObject
+          }
+        case _ => fail
+      }
+    }
+  }
+}
+
 class WsApiSpec extends WordSpec with Matchers
     with Directives with ScalatestRouteTest { self =>
+
+  import WsApiSpec._
+  implicit val matchers: Matchers = this
 
   "WsApi ping-pong" in new WsApi {
     implicit val system: ActorSystem = self.system
@@ -36,7 +55,7 @@ class WsApiSpec extends WordSpec with Matchers
           |}""".stripMargin
       )
 
-      wsClient.expectMessage(
+      wsClient.expectJsonStr(
         """{"$type":"login_failed"}"""
       )
 
@@ -48,16 +67,12 @@ class WsApiSpec extends WordSpec with Matchers
           }""".stripMargin
       )
 
-      wsClient.expectMessage() match {
-        case TextMessage.Strict(msg) =>
-          msg.parseJson.asJsObject should be {
-            """{
-              | "$type": "login_successful",
-              | "user_type": "user"
-              | }""".stripMargin.parseJson.asJsObject
-          }
-        case _ => fail
-      }
+      wsClient.expectJsonStr(
+        """{
+          | "$type": "login_successful",
+          | "user_type": "user"
+          | }"""
+      )
 
       wsClient.sendMessage(
         """{
@@ -67,16 +82,12 @@ class WsApiSpec extends WordSpec with Matchers
         """.stripMargin
       )
 
-      wsClient.expectMessage() match {
-        case TextMessage.Strict(msg) =>
-          msg.parseJson.asJsObject should be {
-            """{
-              | "$type": "pong",
-              | "seq": 1
-              | }""".stripMargin.parseJson.asJsObject
-          }
-        case _ => fail
-      }
+      wsClient.expectJsonStr(
+        """{
+          | "$type": "pong",
+          | "seq": 1
+          |}"""
+      )
 
       wsClient.sendCompletion()
       system.stop(source)

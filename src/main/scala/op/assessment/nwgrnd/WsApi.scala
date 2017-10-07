@@ -44,10 +44,7 @@ trait WsApi extends JsonSupport {
   val route: Route =
     path("ws-api") {
       handleWebSocketMessages(handler)
-    } ~
-      path("ws-api" / "subscribe") {
-        handleWebSocketMessages(subscribeHandler)
-      }
+    }
 
   def auth(name: String, password: String): Option[Auth] = {
     (name, password) match {
@@ -58,7 +55,7 @@ trait WsApi extends JsonSupport {
   }
 
   def tablesSink: Sink[Any, NotUsed] = Sink.actorRef(tables, 'sinkclose)
-  def subscription: Source[Nothing, ActorRef] =
+  def subscriptionSource: Source[Nothing, ActorRef] =
     Source.actorRef(8, OverflowStrategy.fail)
       .mapMaterializedValue { sourceActor ⇒
         tables ! ('income → sourceActor)
@@ -89,16 +86,6 @@ trait WsApi extends JsonSupport {
         case (ClientContext(_), Subscribe) => Tables
       }
       .alsoTo(tablesSink)
-      .merge(subscription)
+      .merge(subscriptionSource)
       .map(out => TextMessage(marshal(out)))
-
-  def subscribeHandler: Flow[Message, Message, Any] = {
-    val in = Sink.actorRef(tables, 'sinkclose)
-    val out = Source.actorRef(8, OverflowStrategy.fail)
-      .mapMaterializedValue { sourceActor ⇒
-        tables ! ('income → sourceActor)
-        sourceActor
-      }
-    Flow.fromSinkAndSource(in, out)
-  }
 }

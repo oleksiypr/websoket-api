@@ -39,7 +39,7 @@ trait WsApi extends JsonSupport {
   implicit val materializer: ActorMaterializer
   import system.dispatcher
 
-  val tables: ActorRef
+  val tablesRepo: ActorRef
 
   val route: Route =
     path("ws-api") {
@@ -54,11 +54,11 @@ trait WsApi extends JsonSupport {
     }
   }
 
-  def tablesSink: Sink[Any, NotUsed] = Sink.actorRef(tables, 'sinkclose)
-  def subscriptionSource: Source[Nothing, ActorRef] =
+  def tables: Sink[Any, NotUsed] = Sink.actorRef(tablesRepo, 'sinkclose)
+  def subscription: Source[Nothing, ActorRef] =
     Source.actorRef(8, OverflowStrategy.fail)
       .mapMaterializedValue { sourceActor ⇒
-        tables ! ('income → sourceActor)
+        tablesRepo ! ('income → sourceActor)
         sourceActor
       }
 
@@ -85,7 +85,7 @@ trait WsApi extends JsonSupport {
         case (c: ClientContext, Ping(seq)) if c.auth.nonEmpty => Pong(seq)
         case (ClientContext(_), Subscribe) => Tables
       }
-      .alsoTo(tablesSink)
-      .merge(subscriptionSource)
+      .alsoTo(tables)
+      .merge(subscription)
       .map(out => TextMessage(marshal(out)))
 }

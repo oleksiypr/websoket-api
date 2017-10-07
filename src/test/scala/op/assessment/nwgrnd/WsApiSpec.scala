@@ -1,12 +1,14 @@
 package op.assessment.nwgrnd
 
 import akka.actor.{ ActorRef, ActorSystem }
+import akka.http.scaladsl.model.ws.TextMessage
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
 import akka.stream.ActorMaterializer
 import akka.testkit.{ TestActor, TestProbe }
 import op.assessment.nwgrnd.WsApi.Tables
 import org.scalatest.{ Matchers, WordSpec }
+import spray.json._
 
 class WsApiSpec extends WordSpec with Matchers
     with Directives with ScalatestRouteTest { self =>
@@ -16,7 +18,7 @@ class WsApiSpec extends WordSpec with Matchers
     implicit val materializer: ActorMaterializer = self.materializer
 
     val probe = TestProbe()
-    val tables: ActorRef = probe.ref
+    val tablesRepo: ActorRef = probe.ref
     val wsClient = WSProbe()
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
@@ -46,9 +48,16 @@ class WsApiSpec extends WordSpec with Matchers
           }""".stripMargin
       )
 
-      wsClient.expectMessage(
-        """{"$type":"login_successful","user_type":"user"}"""
-      )
+      wsClient.expectMessage() match {
+        case TextMessage.Strict(msg) =>
+          msg.parseJson.asJsObject should be {
+            """{
+              | "$type": "login_successful",
+              | "user_type": "user"
+              | }""".stripMargin.parseJson.asJsObject
+          }
+        case _ => fail
+      }
 
       wsClient.sendMessage(
         """{
@@ -58,7 +67,16 @@ class WsApiSpec extends WordSpec with Matchers
         """.stripMargin
       )
 
-      wsClient.expectMessage("""{"$type":"pong","seq":1}""")
+      wsClient.expectMessage() match {
+        case TextMessage.Strict(msg) =>
+          msg.parseJson.asJsObject should be {
+            """{
+              | "$type": "pong",
+              | "seq": 1
+              | }""".stripMargin.parseJson.asJsObject
+          }
+        case _ => fail
+      }
 
       wsClient.sendCompletion()
       system.stop(source)
@@ -71,7 +89,7 @@ class WsApiSpec extends WordSpec with Matchers
     implicit val materializer: ActorMaterializer = self.materializer
 
     val probe = TestProbe()
-    val tables: ActorRef = probe.ref
+    val tablesRepo: ActorRef = probe.ref
     val wsClient = WSProbe()
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
@@ -115,7 +133,7 @@ class WsApiSpec extends WordSpec with Matchers
       //probe.send(source, TextMessage.Strict("subscribed"))
       //wsClient.expectMessage("subscribed")
 
-      tables ! "update"
+      tablesRepo ! "update"
       wsClient.expectMessage("""{"$type":"table_list"}""")
 
       wsClient.sendCompletion()

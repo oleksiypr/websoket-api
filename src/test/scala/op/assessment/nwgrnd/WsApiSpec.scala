@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
 import akka.stream.ActorMaterializer
 import akka.testkit.{ TestActor, TestProbe }
-import op.assessment.nwgrnd.WsApi.{ Subscribe, Table, Tables }
+import op.assessment.nwgrnd.WsApi._
 import org.scalatest.{ Matchers, WordSpec }
 import spray.json._
 
@@ -54,19 +54,9 @@ class WsApiSpec extends WordSpec with Matchers
           | "password":"password12345"
           |}""".stripMargin
       )
+      wsClient.expectJsonStr("""{"$type":"login_failed"}""")
 
-      wsClient.expectJsonStr(
-        """{"$type":"login_failed"}"""
-      )
-
-      wsClient.sendMessage(
-        """{
-          | "$type": "ping",
-          | "seq": 1
-          |}
-        """.stripMargin
-      )
-
+      wsClient.sendMessage("""{"$type": "ping", "seq": 1 }""")
       wsClient.expectNoMessage()
 
       wsClient.sendMessage(
@@ -76,28 +66,12 @@ class WsApiSpec extends WordSpec with Matchers
           | "password":"password-user"
           }""".stripMargin
       )
-
       wsClient.expectJsonStr(
-        """{
-          | "$type": "login_successful",
-          | "user_type": "user"
-          | }"""
+        """{"$type": "login_successful", "user_type": "user"}"""
       )
 
-      wsClient.sendMessage(
-        """{
-          | "$type": "ping",
-          | "seq": 1
-          |}
-        """.stripMargin
-      )
-
-      wsClient.expectJsonStr(
-        """{
-          | "$type": "pong",
-          | "seq": 1
-          |}"""
-      )
+      wsClient.sendMessage("""{ "$type": "ping", "seq": 1 }""")
+      wsClient.expectJsonStr("""{"$type": "pong", "seq": 1}""")
 
       wsClient.sendCompletion()
       system.stop(source)
@@ -123,16 +97,11 @@ class WsApiSpec extends WordSpec with Matchers
         (_: ActorRef, msg: Any) => msg match {
           case Subscribe =>
             probe.send(source, Tables(
-              List(
-                Table(id = 1, "table -James Bond", 7),
-                Table(id = 2, "table -Mission Impossible", 4)
-              )
-            ))
-            TestActor.KeepRunning
-          case "update" =>
-            probe.send(source, Tables(Nil)); TestActor.KeepRunning
+              List(Table(id = 1, "table -James Bond", 7))
+            )); TestActor.KeepRunning
+          case Update(table) =>
+            probe.send(source, Updated(table)); TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
-          case x => println("!!!" + x); TestActor.KeepRunning
         }
       )
 
@@ -145,14 +114,11 @@ class WsApiSpec extends WordSpec with Matchers
       )
 
       wsClient.expectJsonStr(
-        """{"$type":"login_successful","user_type":"user"}"""
+        """{"$type":"login_successful", "user_type":"user"}"""
       )
 
       wsClient.sendMessage(
-        """{
-          | "$type": "subscribe_tables"
-          |}
-        """.stripMargin
+        """{"$type": "subscribe_tables"}""".stripMargin
       )
 
       wsClient.expectJsonStr(
@@ -163,19 +129,22 @@ class WsApiSpec extends WordSpec with Matchers
           |     "id": 1,
           |     "name": "table -James Bond",
           |     "participants": 7
-          |   },
-          |   {
-          |     "id": 2,
-          |     "name": "table -Mission Impossible",
-          |     "participants": 4
           |   }
           | ]
           |}"""
       )
 
-      tablesRepo ! "update"
+      tablesRepo ! Update(Table(id = 1, "table -James Bond", 7))
+
       wsClient.expectJsonStr(
-        """{"$type":"table_list","tables":[]}""".stripMargin
+        """{
+          |"$type": "table_updated",
+          | "table": {
+          |   "id": 1,
+          |   "name": "table -James Bond",
+          |   "participants": 7
+          | }
+          |}""".stripMargin
       )
 
       wsClient.sendCompletion()

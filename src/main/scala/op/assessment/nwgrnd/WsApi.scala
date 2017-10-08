@@ -1,11 +1,11 @@
 package op.assessment.nwgrnd
 
 import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.actor.{ ActorRef, ActorSystem }
+import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.scaladsl.{ Flow, Sink, Source }
+import akka.stream.{ ActorMaterializer, OverflowStrategy }
 import op.assessment.nwgrnd.WsApi._
 
 object WsApi {
@@ -14,6 +14,7 @@ object WsApi {
   case class Login(name: String, pass: String) extends Incoming("login")
   case class Ping(seq: Int) extends Incoming("ping")
   case object Subscribe extends Incoming("subscribe_tables")
+  case class Update(table: Table) extends Incoming("update_table")
 
   trait Outcoming
   case object LoginFailed extends Outcoming
@@ -21,6 +22,7 @@ object WsApi {
   case class Pong(seq: Int) extends Outcoming
   case class Table(id: Int, name: String, participants: Int) extends Outcoming
   case class Tables(tables: List[Table]) extends Outcoming
+  case class Updated(table: Table) extends Outcoming
 }
 
 trait WsApi extends JsonSupport { this: Security =>

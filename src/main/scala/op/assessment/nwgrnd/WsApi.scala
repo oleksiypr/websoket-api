@@ -6,19 +6,10 @@ import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
 import akka.stream.{ ActorMaterializer, OverflowStrategy }
 import akka.stream.scaladsl.{ Flow, Sink, Source }
-import op.assessment.nwgrnd.WsApi.ClientContext.Auth
+import op.assessment.nwgrnd.ClientContext.{ Admin, Principal, User }
 import op.assessment.nwgrnd.WsApi._
 
 object WsApi {
-
-  class ClientContext {
-    @volatile var auth: Option[Auth] = None
-  }
-
-  object ClientContext {
-    def unapply(arg: ClientContext): Option[Auth] = arg.auth
-    case class Auth(userName: String, role: String)
-  }
 
   abstract class Incoming(val $type: String)
   case class Login(name: String, pass: String) extends Incoming("login")
@@ -47,10 +38,10 @@ trait WsApi extends JsonSupport {
       handleWebSocketMessages(handler)
     }
 
-  def auth(name: String, password: String): Option[Auth] = {
+  def auth(name: String, password: String): Option[Principal] = {
     (name, password) match {
-      case ("user", "password-user") => Some(Auth(name, "user"))
-      case ("admin", "password-admin") => Some(Auth(name, "admin"))
+      case ("user", "password-user") => Some(User(name))
+      case ("admin", "password-admin") => Some(Admin(name))
       case _ => None
     }
   }

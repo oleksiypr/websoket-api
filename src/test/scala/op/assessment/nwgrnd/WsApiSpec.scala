@@ -61,6 +61,16 @@ class WsApiSpec extends WordSpec with Matchers
 
       wsClient.sendMessage(
         """{
+          | "$type": "ping",
+          | "seq": 1
+          |}
+        """.stripMargin
+      )
+
+      wsClient.expectNoMessage()
+
+      wsClient.sendMessage(
+        """{
           | "$type":"login",
           | "username":"user",
           | "password":"password-user"

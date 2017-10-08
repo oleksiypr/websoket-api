@@ -32,7 +32,7 @@ class WsApiSpec extends WordSpec with Matchers
   import WsApiSpec._
   implicit val matchers: Matchers = this
 
-  "WsApi ping-pong" in new WsApi {
+  "WsApi ping-pong" in new WsApi with SimpleSecurity {
     implicit val system: ActorSystem = self.system
     implicit val materializer: ActorMaterializer = self.materializer
 
@@ -105,7 +105,7 @@ class WsApiSpec extends WordSpec with Matchers
     }
   }
 
-  "WsApi subscribe" in new WsApi {
+  "WsApi subscribe" in new WsApi with SimpleSecurity {
     implicit val system: ActorSystem = self.system
     implicit val materializer: ActorMaterializer = self.materializer
 

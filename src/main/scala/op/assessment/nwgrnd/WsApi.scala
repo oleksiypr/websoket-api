@@ -1,12 +1,11 @@
 package op.assessment.nwgrnd
 
 import akka.NotUsed
-import akka.actor.{ ActorRef, ActorSystem }
-import akka.http.scaladsl.model.ws.{ Message, TextMessage }
+import akka.actor.{ActorRef, ActorSystem}
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.server.Route
-import akka.stream.{ ActorMaterializer, OverflowStrategy }
-import akka.stream.scaladsl.{ Flow, Sink, Source }
-import op.assessment.nwgrnd.ClientContext.{ Admin, Principal, User }
+import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{ActorMaterializer, OverflowStrategy}
 import op.assessment.nwgrnd.WsApi._
 
 object WsApi {
@@ -24,11 +23,12 @@ object WsApi {
   case class Tables(tables: List[Table]) extends Outcoming
 }
 
-trait WsApi extends JsonSupport {
-  import akka.http.scaladsl.server.Directives._
+trait WsApi extends JsonSupport { this: Security =>
 
   implicit val system: ActorSystem
   implicit val materializer: ActorMaterializer
+
+  import akka.http.scaladsl.server.Directives._
   import system.dispatcher
 
   val tablesRepo: ActorRef
@@ -37,14 +37,6 @@ trait WsApi extends JsonSupport {
     path("ws-api") {
       handleWebSocketMessages(handler)
     }
-
-  def auth(name: String, password: String): Option[Principal] = {
-    (name, password) match {
-      case ("user", "password-user") => Some(User(name))
-      case ("admin", "password-admin") => Some(Admin(name))
-      case _ => None
-    }
-  }
 
   def tables: Sink[(ClientContext, Incoming), NotUsed] = {
     Flow[(ClientContext, Incoming)].collect {
@@ -71,7 +63,7 @@ trait WsApi extends JsonSupport {
       })
       .mapConcat {
         case m @ (c: ClientContext, Login(name, pass)) =>
-          c.auth = auth(name, pass)
+          c.principal = authService.auth(name, pass)
           m :: Nil
         case m @ (_: ClientContext, _) => m :: Nil
 
@@ -80,7 +72,7 @@ trait WsApi extends JsonSupport {
       .collect {
         case (ClientContext(auth), Login(_, _)) ⇒ LoginSuccessful(auth.role)
         case (_: ClientContext, Login(_, _)) => LoginFailed
-        case (c: ClientContext, Ping(seq)) if c.auth.nonEmpty => Pong(seq)
+        case (c: ClientContext, Ping(seq)) if c.principal.nonEmpty => Pong(seq)
       }
       .merge(subscription)
       .map(out => TextMessage(marshal(out)))

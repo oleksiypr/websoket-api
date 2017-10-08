@@ -6,11 +6,10 @@ import op.assessment.nwgrnd.WsApi._
 import spray.json._
 
 trait JsonSupport extends SprayJsonSupport {
+
   import DefaultJsonProtocol._
-
-  type Format[T] = RootJsonFormat[T]
-
   implicit val materializer: Materializer
+  type Format[T] = RootJsonFormat[T]
 
   implicit val loginFormat: Format[Login] = jsonFormat(Login, "username", "password")
   implicit val loginSuccessfulFormat: Format[LoginSuccessful] = jsonFormat(LoginSuccessful, "user_type")

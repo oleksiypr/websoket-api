@@ -8,28 +8,33 @@ import akka.stream.scaladsl.{ Flow, Sink, Source }
 import akka.stream.stage.{ GraphStage, GraphStageLogic, InHandler, OutHandler }
 import akka.stream._
 import op.assessment.nwgrnd.WsApi._
+import scala.concurrent.Future
 
 object WsApi {
 
-  trait ClientIn
-  trait ClientOut
+  sealed trait ClientIn
+  sealed trait ClientOut
 
-  abstract class WsIn(val $type: String) extends ClientIn
+  sealed abstract class WsIn(val $type: String) extends ClientIn
   case class Login(name: String, pass: String) extends WsIn("login")
   case class Ping(seq: Int) extends WsIn("ping")
-  case object Subscribe extends WsIn("subscribe_tables") with ClientOut
-  case object Unsubscribe extends WsIn("unsubscribe_tables")
-  case class Update(table: Table) extends WsIn("update_table") with ClientOut
-  case class Remove(id: String) extends WsIn("remove_table") with ClientOut
 
-  trait WsOut extends ClientOut
+  sealed trait TableCommand
+  case object Subscribe extends WsIn("subscribe_tables") with TableCommand with ClientOut
+  case object Unsubscribe extends WsIn("unsubscribe_tables") with TableCommand
+  case class Update(table: Table) extends WsIn("update_table") with TableCommand with ClientOut
+  case class Remove(id: String) extends WsIn("remove_table") with TableCommand with ClientOut
+
+  sealed trait WsOut extends ClientOut
   case object LoginFailed extends WsOut
   case class LoginSuccessful(userType: String) extends WsOut
   case class Pong(seq: Int) extends WsOut
+
+  sealed trait TableEvent extends WsOut with ClientIn
   case class Table(id: Int, name: String, participants: Int) extends WsOut
-  case class Tables(tables: List[Table]) extends WsOut with ClientIn
-  case class Updated(table: Table) extends WsOut with ClientIn
-  case class Removed(id: String) extends WsOut with ClientIn
+  case class Subscribed(tables: List[Table]) extends TableEvent
+  case class Updated(table: Table) extends TableEvent
+  case class Removed(id: String) extends TableEvent
 }
 
 trait WsApi extends JsonSupport { this: Security =>
@@ -49,7 +54,7 @@ trait WsApi extends JsonSupport { this: Security =>
 
   def tables: Sink[ClientOut, NotUsed] = {
     Flow[ClientOut].collect {
-      case in: WsIn => in
+      case in: TableCommand => in
     }.to(Sink.actorRef(tablesRepo, 'sinkclose))
   }
 
@@ -70,7 +75,7 @@ trait WsApi extends JsonSupport { this: Security =>
       .via(new ClientFlow)
       .alsoTo(tables)
       .collect({ case out: WsOut => out })
-      .map(out => TextMessage(marshal(out)))
+      .mapAsync(2)(out => Future(TextMessage(marshal(out))))
 
   class ClientFlow extends GraphStage[FlowShape[ClientIn, ClientOut]] {
 
@@ -99,9 +104,11 @@ trait WsApi extends JsonSupport { this: Security =>
             case Subscribe =>
               ctx.isSubscribed = true
               push(out, Subscribe)
-            case ts: Tables if ctx.isSubscribed => push(out, ts)
-            case u: Updated if ctx.isSubscribed => push(out, u)
-            case ts: Tables => pull(in)
+            case Unsubscribe =>
+              ctx.isSubscribed = false
+              pull(in)
+            case te: TableEvent if ctx.isSubscribed => push(out, te)
+            case _ => pull(in)
           }
         }
       })

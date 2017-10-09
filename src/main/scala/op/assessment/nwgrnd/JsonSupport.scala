@@ -18,8 +18,11 @@ trait JsonSupport extends SprayJsonSupport {
   implicit val loginFailedWriter: JsonWriter[LoginFailed.type] = _ => JsObject.empty
   implicit val tableFormat: Format[Table] = jsonFormat(Table, "id", "name", "participants")
   implicit val tablesFormat: Format[Tables] = jsonFormat(Tables, "tables")
+
   implicit val updateFormat: Format[Update] = jsonFormat(Update, "table")
   implicit val updatedFormat: Format[Updated] = jsonFormat(Updated, "table")
+  implicit val removeFormat: Format[Remove] = jsonFormat(Remove, "id")
+  implicit val removedFormat: Format[Removed] = jsonFormat(Removed, "id")
 
   def unmarshal(in: String): Incoming = {
     val json = in.parseJson.asJsObject
@@ -28,7 +31,9 @@ trait JsonSupport extends SprayJsonSupport {
       case "login" => payload.convertTo[Login]
       case "ping" => payload.convertTo[Ping]
       case "subscribe_tables" => Subscribe
+      case "unsubscribe_tables" => Unsubscribe
       case "update_table" => payload.convertTo[Update]
+      case "remove_table" => payload.convertTo[Remove]
     }
   }
 
@@ -38,6 +43,7 @@ trait JsonSupport extends SprayJsonSupport {
     case out: Pong => marshal(out, "pong")
     case out: Tables => marshal(out, "table_list")
     case out: Updated => marshal(out, "table_updated")
+    case out: Removed => marshal(out, "table_removed")
   }
 
   def marshal[T <: Outcoming: JsonWriter](out: T, $type: String): String = {

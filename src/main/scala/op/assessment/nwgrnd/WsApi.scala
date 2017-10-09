@@ -14,7 +14,9 @@ object WsApi {
   case class Login(name: String, pass: String) extends Incoming("login")
   case class Ping(seq: Int) extends Incoming("ping")
   case object Subscribe extends Incoming("subscribe_tables")
+  case object Unsubscribe extends Incoming("unsubscribe_tables")
   case class Update(table: Table) extends Incoming("update_table")
+  case class Remove(id: String) extends Incoming("remove_table")
 
   trait Outcoming
   case object LoginFailed extends Outcoming
@@ -23,6 +25,7 @@ object WsApi {
   case class Table(id: Int, name: String, participants: Int) extends Outcoming
   case class Tables(tables: List[Table]) extends Outcoming
   case class Updated(table: Table) extends Outcoming
+  case class Removed(id: String) extends Outcoming
 }
 
 trait WsApi extends JsonSupport { this: Security =>
@@ -42,7 +45,11 @@ trait WsApi extends JsonSupport { this: Security =>
 
   def tables: Sink[(ClientContext, Incoming), NotUsed] = {
     Flow[(ClientContext, Incoming)].collect {
-      case (ClientContext(_), Subscribe) => Subscribe
+      case (ctx @ ClientContext(_), Subscribe) =>
+        ctx.isSubscribed = true
+        Subscribe
+      case (ctx @ ClientContext(_), Unsubscribe) =>
+        ctx.isSubscribed = false
     }.to(Sink.actorRef(tablesRepo, 'sinkclose))
   }
 

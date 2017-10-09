@@ -12,8 +12,10 @@ object ClientContext {
 }
 
 class ClientContext {
-  @volatile
-  var principal: Option[Principal] = None
+
+  @volatile var isSubscribed: Boolean = false
+  @volatile var principal: Option[Principal] = None
+
 }
 
 trait AuthService {

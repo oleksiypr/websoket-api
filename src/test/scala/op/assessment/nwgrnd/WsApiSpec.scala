@@ -101,7 +101,9 @@ class WsApiSpec extends WordSpec with Matchers
             )); TestActor.KeepRunning
           case Update(table) =>
             probe.send(source, Updated(table)); TestActor.KeepRunning
+
           case 'sinkclose => TestActor.NoAutoPilot
+          case x => println("!!!! ->" + x); TestActor.KeepRunning
         }
       )
 
@@ -117,9 +119,7 @@ class WsApiSpec extends WordSpec with Matchers
         """{"$type":"login_successful", "user_type":"user"}"""
       )
 
-      wsClient.sendMessage(
-        """{"$type": "subscribe_tables"}""".stripMargin
-      )
+      wsClient.sendMessage("""{"$type": "subscribe_tables"}""")
 
       wsClient.expectJsonStr(
         """{
@@ -146,6 +146,10 @@ class WsApiSpec extends WordSpec with Matchers
           | }
           |}""".stripMargin
       )
+
+      wsClient.sendMessage("""{"$type": "unsubscribe_tables"}""")
+      //tablesRepo ! Update(Table(id = 1, "table -James Bond", 7))
+      wsClient.expectNoMessage()
 
       wsClient.sendCompletion()
       system.stop(source)

@@ -17,7 +17,7 @@ object WsApi {
   abstract class WsIn(val $type: String) extends ClientIn
   case class Login(name: String, pass: String) extends WsIn("login")
   case class Ping(seq: Int) extends WsIn("ping")
-  case object Subscribe extends WsIn("subscribe_tables")
+  case object Subscribe extends WsIn("subscribe_tables") with ClientOut
   case object Unsubscribe extends WsIn("unsubscribe_tables")
   case class Update(table: Table) extends WsIn("update_table") with ClientOut
   case class Remove(id: String) extends WsIn("remove_table") with ClientOut
@@ -27,7 +27,7 @@ object WsApi {
   case class LoginSuccessful(userType: String) extends WsOut
   case class Pong(seq: Int) extends WsOut
   case class Table(id: Int, name: String, participants: Int) extends WsOut
-  case class Tables(tables: List[Table]) extends WsOut
+  case class Tables(tables: List[Table]) extends WsOut with ClientIn
   case class Updated(table: Table) extends WsOut with ClientIn
   case class Removed(id: String) extends WsOut with ClientIn
 }
@@ -47,13 +47,9 @@ trait WsApi extends JsonSupport { this: Security =>
       handleWebSocketMessages(clientHandler)
     }
 
-  def tables: Sink[(ClientContext, WsIn), NotUsed] = {
-    Flow[(ClientContext, WsIn)].collect {
-      case (ctx @ ClientContext(_), Subscribe) =>
-        ctx.isSubscribed = true
-        Subscribe
-      case (ctx @ ClientContext(_), Unsubscribe) =>
-        ctx.isSubscribed = false
+  def tables: Sink[ClientOut, NotUsed] = {
+    Flow[ClientOut].collect {
+      case in: WsIn => in
     }.to(Sink.actorRef(tablesRepo, 'sinkclose))
   }
 
@@ -64,32 +60,6 @@ trait WsApi extends JsonSupport { this: Security =>
         sourceActor
       }
 
-  def handler: Flow[Message, Message, Any] =
-    Flow[Message]
-      .collect {
-        case tm: TextMessage ⇒ tm.textStream
-      }
-      .mapAsync(2)(in => in.runFold("")(_ + _).map(unmarshal))
-      .statefulMapConcat(() ⇒ {
-        val context = new ClientContext
-        m ⇒ (context → m) :: Nil
-      })
-      .mapConcat {
-        case m @ (c: ClientContext, Login(name, pass)) =>
-          c.principal = authService.auth(name, pass)
-          m :: Nil
-        case m @ (_: ClientContext, _) => m :: Nil
-
-      }
-      .alsoTo(tables)
-      .collect {
-        case (ClientContext(auth), Login(_, _)) ⇒ LoginSuccessful(auth.role)
-        case (_: ClientContext, Login(_, _)) => LoginFailed
-        case (c: ClientContext, Ping(seq)) if c.principal.nonEmpty => Pong(seq)
-      }
-      .merge(subscription)
-      .map((out: WsOut) => TextMessage(marshal(out)))
-
   def clientHandler: Flow[Message, TextMessage, NotUsed] =
     Flow[Message]
       .collect {
@@ -98,6 +68,7 @@ trait WsApi extends JsonSupport { this: Security =>
       .mapAsync(2)(in => in.runFold("")(_ + _).map(unmarshal))
       .merge(subscription)
       .via(new ClientFlow)
+      .alsoTo(tables)
       .collect({ case out: WsOut => out })
       .map(out => TextMessage(marshal(out)))
 
@@ -123,8 +94,14 @@ trait WsApi extends JsonSupport { this: Security =>
                   push(out, LoginSuccessful(principal.role))
                 case None => push(out, LoginFailed)
               }
-            case Ping(seq) if ctx.principal.nonEmpty => push(out, Pong(seq))
-            case _ => pull(in)
+            case _ if ctx.principal.isEmpty => pull(in)
+            case Ping(seq) => push(out, Pong(seq))
+            case Subscribe =>
+              ctx.isSubscribed = true
+              push(out, Subscribe)
+            case ts: Tables if ctx.isSubscribed => push(out, ts)
+            case u: Updated if ctx.isSubscribed => push(out, u)
+            case ts: Tables => pull(in)
           }
         }
       })

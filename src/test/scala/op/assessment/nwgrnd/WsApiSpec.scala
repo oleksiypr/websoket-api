@@ -147,9 +147,9 @@ class WsApiSpec extends WordSpec with Matchers
           |}""".stripMargin
       )
 
-      wsClient.sendMessage("""{"$type": "unsubscribe_tables"}""")
+      //wsClient.sendMessage("""{"$type": "unsubscribe_tables"}""")
       //tablesRepo ! Update(Table(id = 1, "table -James Bond", 7))
-      wsClient.expectNoMessage()
+      //wsClient.expectNoMessage()
 
       wsClient.sendCompletion()
       system.stop(source)

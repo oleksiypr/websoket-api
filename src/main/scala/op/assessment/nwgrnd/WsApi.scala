@@ -6,7 +6,8 @@ import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
 import akka.stream._
 import akka.stream.scaladsl.{ Flow, Sink, Source }
-import op.assessment.nwgrnd.WsApi._
+import op.assessment.nwgrnd.WsApi.{ ClientOut, TableCommand, WsOut }
+
 import scala.concurrent.Future
 
 object WsApi {
@@ -18,21 +19,25 @@ object WsApi {
   case class Login(name: String, pass: String) extends WsIn("login")
   case class Ping(seq: Int) extends WsIn("ping")
 
+  case class Table(name: String, participants: Int)
+  case class IdTable(id: Int, name: String, participants: Int)
+
   sealed trait TableCommand
   case object Subscribe extends WsIn("subscribe_tables") with TableCommand with ClientOut
   case object Unsubscribe extends WsIn("unsubscribe_tables") with TableCommand
-  case class Update(table: Table) extends WsIn("update_table") with TableCommand with ClientOut
+  case class Update(table: IdTable) extends WsIn("update_table") with TableCommand with ClientOut
   case class Remove(id: String) extends WsIn("remove_table") with TableCommand with ClientOut
+  case class Add(afterId: Int, table: Table) extends WsIn("add_table") with TableCommand with ClientOut
 
   sealed trait WsOut extends ClientOut
   case object LoginFailed extends WsOut
+  case object NotAuthorized extends WsOut
   case class LoginSuccessful(userType: String) extends WsOut
   case class Pong(seq: Int) extends WsOut
 
   sealed trait TableEvent extends WsOut with ClientIn
-  case class Table(id: Int, name: String, participants: Int) extends WsOut
-  case class Subscribed(tables: List[Table]) extends TableEvent
-  case class Updated(table: Table) extends TableEvent
+  case class Subscribed(tables: List[IdTable]) extends TableEvent
+  case class Updated(table: IdTable) extends TableEvent
   case class Removed(id: String) extends TableEvent
 }
 

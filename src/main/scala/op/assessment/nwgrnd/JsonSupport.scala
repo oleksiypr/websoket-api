@@ -16,13 +16,17 @@ trait JsonSupport extends SprayJsonSupport {
   implicit val pingFormat: Format[Ping] = jsonFormat(Ping, "seq")
   implicit val pongFormat: Format[Pong] = jsonFormat(Pong, "seq")
   implicit val loginFailedWriter: JsonWriter[LoginFailed.type] = _ => JsObject.empty
+  implicit val notAuthorizedWriter: JsonWriter[NotAuthorized.type] = _ => JsObject.empty
 
-  implicit val tableFormat: Format[Table] = jsonFormat(Table, "id", "name", "participants")
+  implicit val idTableFormat: Format[IdTable] = jsonFormat(IdTable, "id", "name", "participants")
+  implicit val tableFormat: Format[Table] = jsonFormat(Table, "name", "participants")
   implicit val subscribedFormat: Format[Subscribed] = jsonFormat(Subscribed, "tables")
 
+  implicit val addFormat: Format[Add] = jsonFormat(Add, "after_id", "table")
   implicit val updateFormat: Format[Update] = jsonFormat(Update, "table")
+  implicit val remove: Format[Remove] = jsonFormat(Remove, "id")
+
   implicit val updatedFormat: Format[Updated] = jsonFormat(Updated, "table")
-  implicit val removeFormat: Format[Remove] = jsonFormat(Remove, "id")
   implicit val removedFormat: Format[Removed] = jsonFormat(Removed, "id")
 
   def unmarshal(in: String): WsIn = {
@@ -33,6 +37,7 @@ trait JsonSupport extends SprayJsonSupport {
       case "ping" => payload.convertTo[Ping]
       case "subscribe_tables" => Subscribe
       case "unsubscribe_tables" => Unsubscribe
+      case "add_table" => payload.convertTo[Add]
       case "update_table" => payload.convertTo[Update]
       case "remove_table" => payload.convertTo[Remove]
     }
@@ -40,12 +45,12 @@ trait JsonSupport extends SprayJsonSupport {
 
   def marshal(out: WsOut): String = out match {
     case out: LoginFailed.type => marshal(out, "login_failed")
+    case out: NotAuthorized.type => marshal(out, "not_authorized")
     case out: LoginSuccessful => marshal(out, "login_successful")
     case out: Pong => marshal(out, "pong")
     case out: Subscribed => marshal(out, "table_list")
     case out: Updated => marshal(out, "table_updated")
     case out: Removed => marshal(out, "table_removed")
-    case out: Table => marshal(out, "table")
   }
 
   def marshal[T <: WsOut: JsonWriter](out: T, $type: String): String = {

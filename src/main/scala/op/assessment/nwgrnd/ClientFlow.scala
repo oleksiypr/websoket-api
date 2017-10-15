@@ -36,6 +36,9 @@ final class ClientFlow private[nwgrnd] (security: Security)
             ctx.isSubscribed = false
             pull(in)
           case te: TableEvent if ctx.isSubscribed => push(out, te)
+          case tc: TableCommand with ClientOut =>
+            if (ctx.isAuthorized) push(out, tc)
+            else push(out, NotAuthorized)
           case _ => pull(in)
         }
       }

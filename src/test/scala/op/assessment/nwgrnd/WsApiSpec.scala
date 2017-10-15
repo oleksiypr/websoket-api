@@ -97,7 +97,7 @@ class WsApiSpec extends WordSpec with Matchers
         (_: ActorRef, msg: Any) => msg match {
           case Subscribe =>
             probe.send(source, Subscribed(
-              List(Table(id = 1, "table -James Bond", 7))
+              List(IdTable(id = 1, "table -James Bond", 7))
             )); TestActor.KeepRunning
           case Update(table) =>
             probe.send(source, Updated(table)); TestActor.KeepRunning
@@ -129,7 +129,7 @@ class WsApiSpec extends WordSpec with Matchers
           |}"""
       )
 
-      tablesRepo ! Update(Table(id = 1, "table -James Bond", 7))
+      tablesRepo ! Update(IdTable(id = 1, "table -James Bond", 7))
 
       wsClient.expectJsonStr(
         """{
@@ -145,7 +145,7 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.sendMessage("""{"$type": "unsubscribe_tables"}""")
       wsClient.expectNoMessage()
 
-      tablesRepo ! Update(Table(id = 1, "table -James Bond 2", 8))
+      tablesRepo ! Update(IdTable(id = 1, "table -James Bond 2", 8))
 
       wsClient.sendMessage("""{ "$type": "ping", "seq": 1 }""")
       wsClient.expectJsonStr("""{"$type": "pong", "seq": 1}""")
@@ -166,6 +166,44 @@ class WsApiSpec extends WordSpec with Matchers
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
+      val source: ActorRef = probe.expectMsgPF() {
+        case ('income, source: ActorRef) => source
+      }
+      probe.setAutoPilot(
+        (_: ActorRef, msg: Any) => msg match {
+          case add @ Add(_, _) =>
+            probe.send(source, add); TestActor.KeepRunning
+          case 'sinkclose => TestActor.NoAutoPilot
+          case _ => TestActor.KeepRunning
+        }
+      )
+
+      wsClient.sendMessage(
+        """{
+          | "$type":"login",
+          | "username":"user",
+          | "password":"password-user"
+          }""".stripMargin
+      )
+      wsClient.expectJsonStr(
+        """{"$type": "login_successful", "user_type": "user"}"""
+      )
+
+      wsClient.sendMessage(
+        """{
+          | "$type": "add_table",
+          | "after_id": 1,
+          | "table": {
+          |   "name": "table -James Bond",
+          |   "participants": 7
+          | }
+          |}""".stripMargin
+      )
+      wsClient.expectJsonStr("""{"$type": "not_authorized"}""")
+
+      wsClient.sendCompletion()
+      system.stop(source)
+      wsClient.expectCompletion()
     }
   }
 }

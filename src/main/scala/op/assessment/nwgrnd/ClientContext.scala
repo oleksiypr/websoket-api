@@ -14,6 +14,7 @@ object ClientContext {
 class ClientContext {
   @volatile var isSubscribed: Boolean = false
   @volatile var principal: Option[Principal] = None
+  def isAuthorized: Boolean = principal.exists(_.role == "admin")
 }
 
 trait Security {

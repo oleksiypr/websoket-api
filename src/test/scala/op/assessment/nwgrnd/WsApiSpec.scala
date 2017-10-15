@@ -148,8 +148,15 @@ class WsApiSpec extends WordSpec with Matchers
       }
       probe.setAutoPilot(
         (_: ActorRef, msg: Any) => msg match {
-          case add @ Add(_, _) =>
-            probe.send(source, add); TestActor.KeepRunning
+          case Add(afterId, table) =>
+            probe.send(
+              source,
+              Added(
+                afterId,
+                IdTable(id = 3, table.name, table.participants)
+              )
+            )
+            TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case _ => TestActor.KeepRunning
         }
@@ -170,6 +177,23 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.expectJsonStr("""{"$type": "not_authorized"}""")
 
       adminLoginSucceed(wsClient)
+
+      wsClient.sendMessage(
+        """{
+          | "$type": "add_table",
+          | "after_id": 1,
+          | "table": {
+          |   "name": "table -James Bond",
+          |   "participants": 7
+          | }
+          |}""".stripMargin
+      )
+      probe.expectMsg(
+        Add(
+          afterId = 1,
+          Table(name = "table -James Bond", participants = 7)
+        )
+      )
 
       wsClient.sendCompletion()
       system.stop(source)

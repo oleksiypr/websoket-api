@@ -1,13 +1,11 @@
 package op.assessment.nwgrnd
 
-import akka.NotUsed
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
 import akka.stream._
 import akka.stream.scaladsl.{ Flow, Sink, Source }
 import op.assessment.nwgrnd.WsApi.{ ClientOut, TableCommand, WsOut }
-
 import scala.concurrent.Future
 
 object WsApi {
@@ -37,6 +35,7 @@ object WsApi {
 
   sealed trait TableEvent extends WsOut with ClientIn
   case class Subscribed(tables: List[IdTable]) extends TableEvent
+  case class Added(afterId: Int, table: IdTable) extends TableEvent
   case class Updated(table: IdTable) extends TableEvent
   case class Removed(id: String) extends TableEvent
 }
@@ -53,39 +52,42 @@ trait WsApi extends JsonSupport { this: Service =>
 
   val route: Route =
     path("ws-api") {
-      handleWebSocketMessages(clientHandler)
+      handleWebSocketMessages {
+        clientHandler
+      }
     }
 
-  def tables: Sink[ClientOut, NotUsed] = {
+  private def tables = {
     Flow[ClientOut].collect {
       case in: TableCommand => in
-    }.to(Sink.actorRef(tablesRepo, 'sinkclose))
+    } to {
+      Sink.actorRef(tablesRepo, 'sinkclose)
+    }
   }
 
-  def subscription: Source[Nothing, ActorRef] =
+  private def subscription: Source[Nothing, ActorRef] =
     Source.actorRef(8, OverflowStrategy.fail)
       .mapMaterializedValue { sourceActor ⇒
         tablesRepo ! ('income → sourceActor)
         sourceActor
       }
 
-  def clientFlow: ClientFlow = new ClientFlow(security)
+  private def clientFlow = new ClientFlow(security)
 
-  def clientHandler: Flow[Message, TextMessage, NotUsed] =
-    Flow[Message]
-      .collect {
-        case tm: TextMessage ⇒ tm.textStream
-      }
-      .mapAsync(2) { in =>
-        in.runFold("")(_ + _).map(unmarshal)
-      }
-      .merge(subscription)
-      .via(clientFlow)
-      .alsoTo(tables)
-      .collect {
-        case out: WsOut => out
-      }
-      .mapAsync(2) { out =>
-        Future(TextMessage(marshal(out)))
-      }
+  private def clientHandler = Flow[Message]
+    .collect {
+      case tm: TextMessage ⇒ tm.textStream
+    }
+    .mapAsync(2) { in =>
+      in.runFold("")(_ + _).map(unmarshal)
+    }
+    .merge(subscription)
+    .via(clientFlow)
+    .alsoTo(tables)
+    .collect {
+      case out: WsOut => out
+    }
+    .mapAsync(2) { out =>
+      Future(TextMessage(marshal(out)))
+    }
 }

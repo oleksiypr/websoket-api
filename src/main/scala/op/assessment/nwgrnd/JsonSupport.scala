@@ -26,6 +26,7 @@ trait JsonSupport extends SprayJsonSupport {
   implicit val updateFormat: Format[Update] = jsonFormat(Update, "table")
   implicit val remove: Format[Remove] = jsonFormat(Remove, "id")
 
+  implicit val addedFormat: Format[Added] = jsonFormat(Added, "after_id", "table")
   implicit val updatedFormat: Format[Updated] = jsonFormat(Updated, "table")
   implicit val removedFormat: Format[Removed] = jsonFormat(Removed, "id")
 
@@ -49,6 +50,7 @@ trait JsonSupport extends SprayJsonSupport {
     case out: LoginSuccessful => marshal(out, "login_successful")
     case out: Pong => marshal(out, "pong")
     case out: Subscribed => marshal(out, "table_list")
+    case out: Added => marshal(out, "table_added")
     case out: Updated => marshal(out, "table_updated")
     case out: Removed => marshal(out, "table_removed")
   }

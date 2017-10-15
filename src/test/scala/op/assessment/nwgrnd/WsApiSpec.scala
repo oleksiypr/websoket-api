@@ -32,7 +32,7 @@ class WsApiSpec extends WordSpec with Matchers
   import WsApiSpec._
   implicit val matchers: Matchers = this
 
-  "WsApi ping-pong" in new WsApi with SimpleSecurity {
+  "WsApi ping-pong" in new WsApi with SimpleService {
     implicit val system: ActorSystem = self.system
     implicit val materializer: ActorMaterializer = self.materializer
 
@@ -79,7 +79,7 @@ class WsApiSpec extends WordSpec with Matchers
     }
   }
 
-  "WsApi subscribe" in new WsApi with SimpleSecurity {
+  "WsApi subscribe" in new WsApi with SimpleService {
     implicit val system: ActorSystem = self.system
     implicit val materializer: ActorMaterializer = self.materializer
 
@@ -153,6 +153,19 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.sendCompletion()
       system.stop(source)
       wsClient.expectCompletion()
+    }
+  }
+
+  "WsApi commands" in new WsApi with SimpleService {
+    implicit val system: ActorSystem = self.system
+    implicit val materializer: ActorMaterializer = self.materializer
+
+    val probe = TestProbe()
+    val tablesRepo: ActorRef = probe.ref
+    val wsClient = WSProbe()
+
+    WS("/ws-api", wsClient.flow) ~> route ~> check {
+      isWebSocketUpgrade shouldEqual true
     }
   }
 }

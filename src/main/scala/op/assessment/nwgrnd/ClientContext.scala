@@ -12,22 +12,20 @@ object ClientContext {
 }
 
 class ClientContext {
-
   @volatile var isSubscribed: Boolean = false
   @volatile var principal: Option[Principal] = None
-
-}
-
-trait AuthService {
-  def auth(name: String, password: String): Option[Principal]
 }
 
 trait Security {
-  val authService: AuthService
+  def auth(name: String, password: String): Option[Principal]
 }
 
-trait SimpleSecurity extends Security {
-  val authService: AuthService = {
+trait Service {
+  val security: Security
+}
+
+trait SimpleService extends Service {
+  val security: Security = {
     case ("user", "password-user") => Some(User("user"))
     case ("admin", "password-admin") => Some(Admin("admin"))
     case (_, _) => None

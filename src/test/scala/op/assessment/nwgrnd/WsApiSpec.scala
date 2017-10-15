@@ -47,28 +47,12 @@ class WsApiSpec extends WordSpec with Matchers
         case ('income, source: ActorRef) => source
       }
 
-      wsClient.sendMessage(
-        """{
-          | "$type":"login",
-          | "username":"user1234",
-          | "password":"password12345"
-          |}""".stripMargin
-      )
-      wsClient.expectJsonStr("""{"$type":"login_failed"}""")
+      loginFailed(wsClient)
 
       wsClient.sendMessage("""{"$type": "ping", "seq": 1 }""")
       wsClient.expectNoMessage()
 
-      wsClient.sendMessage(
-        """{
-          | "$type":"login",
-          | "username":"user",
-          | "password":"password-user"
-          }""".stripMargin
-      )
-      wsClient.expectJsonStr(
-        """{"$type": "login_successful", "user_type": "user"}"""
-      )
+      userLoginSucceed(wsClient)
 
       wsClient.sendMessage("""{ "$type": "ping", "seq": 1 }""")
       wsClient.expectJsonStr("""{"$type": "pong", "seq": 1}""")
@@ -106,14 +90,7 @@ class WsApiSpec extends WordSpec with Matchers
         }
       )
 
-      wsClient.sendMessage(
-        """{
-          | "$type":"login",
-          | "username":"user",
-          | "password":"password-user"
-          }""".stripMargin
-      )
-      wsClient.expectMessage()
+      userLoginSucceed(wsClient)
 
       wsClient.sendMessage("""{"$type": "subscribe_tables"}""")
       wsClient.expectJsonStr(
@@ -178,16 +155,7 @@ class WsApiSpec extends WordSpec with Matchers
         }
       )
 
-      wsClient.sendMessage(
-        """{
-          | "$type":"login",
-          | "username":"user",
-          | "password":"password-user"
-          }""".stripMargin
-      )
-      wsClient.expectJsonStr(
-        """{"$type": "login_successful", "user_type": "user"}"""
-      )
+      userLoginSucceed(wsClient)
 
       wsClient.sendMessage(
         """{
@@ -201,9 +169,51 @@ class WsApiSpec extends WordSpec with Matchers
       )
       wsClient.expectJsonStr("""{"$type": "not_authorized"}""")
 
+      adminLoginSucceed(wsClient)
+
       wsClient.sendCompletion()
       system.stop(source)
       wsClient.expectCompletion()
     }
+  }
+
+  private def loginFailed(wsClient: WSProbe): Unit = {
+    wsClient.sendMessage(
+      """{
+        | "$type":"login",
+        | "username":"user1234",
+        | "password":"password12345"
+        |}""".
+      stripMargin
+    )
+    wsClient.expectJsonStr(
+      """{"$type":"login_failed"}"""
+    )
+  }
+
+  private def userLoginSucceed(wsClient: WSProbe): Unit = {
+    wsClient.sendMessage(
+      """{
+          | "$type":"login",
+          | "username":"user",
+          | "password":"password-user"
+          }""".stripMargin
+    )
+    wsClient.expectJsonStr(
+      """{"$type": "login_successful", "user_type": "user"}"""
+    )
+  }
+
+  private def adminLoginSucceed(wsClient: WSProbe): Unit = {
+    wsClient.sendMessage(
+      """{
+          | "$type":"login",
+          | "username":"admin",
+          | "password":"password-admin"
+          }""".stripMargin
+    )
+    wsClient.expectJsonStr(
+      """{"$type": "login_successful", "user_type": "admin"}"""
+    )
   }
 }

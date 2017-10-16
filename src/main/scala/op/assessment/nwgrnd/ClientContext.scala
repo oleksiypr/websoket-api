@@ -1,6 +1,7 @@
 package op.assessment.nwgrnd
 
 import op.assessment.nwgrnd.ClientContext._
+import op.assessment.nwgrnd.Security.Principal
 import op.assessment.nwgrnd.WsApi._
 
 object ClientContext {
@@ -12,10 +13,6 @@ object ClientContext {
   private sealed trait Expectation
   private case class UpdateExpectation(id: Int) extends Expectation
   private case class RemovalExpectation(id: Int) extends Expectation
-
-  abstract class Principal(name: String, val role: String)
-  case class User(name: String) extends Principal(name, "user")
-  case class Admin(name: String) extends Principal(name, "admin")
 }
 
 class ClientContext {

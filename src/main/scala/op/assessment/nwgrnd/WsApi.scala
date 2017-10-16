@@ -1,5 +1,6 @@
 package op.assessment.nwgrnd
 
+import akka.NotUsed
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
@@ -63,7 +64,7 @@ trait WsApi extends JsonSupport { this: Service =>
       }
     }
 
-  private def tables = {
+  private def tables: Sink[ClientOut, NotUsed] = {
     Flow[ClientOut].collect {
       case in: TableCommand => in
     } to {

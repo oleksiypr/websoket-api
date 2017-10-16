@@ -20,14 +20,16 @@ object WsApi {
   case class Table(name: String, participants: Int)
   case class IdTable(id: Int, name: String, participants: Int)
 
-  sealed trait TableCommand
+  trait TableRelated
+
+  sealed trait TableCommand extends TableRelated
   case object Subscribe extends WsIn("subscribe_tables") with TableCommand with ClientOut
   case object Unsubscribe extends WsIn("unsubscribe_tables") with TableCommand
   case class Update(table: IdTable) extends WsIn("update_table") with TableCommand with ClientOut
   case class Remove(id: Int) extends WsIn("remove_table") with TableCommand with ClientOut
   case class Add(afterId: Int, table: Table) extends WsIn("add_table") with TableCommand with ClientOut
 
-  trait TableResult extends ClientIn
+  trait TableResult extends TableRelated with ClientIn
 
   sealed trait WsOut extends ClientOut
   case object LoginFailed extends WsOut

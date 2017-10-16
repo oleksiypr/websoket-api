@@ -5,6 +5,8 @@ import op.assessment.nwgrnd.WsApi._
 
 object ClientContext {
 
+  private type Mapping = PartialFunction[TableRelated, Expectation]
+
   def unapply(arg: ClientContext): Option[Principal] = arg.principal
 
   private sealed trait Expectation
@@ -25,35 +27,31 @@ class ClientContext {
 
   def isAuthorized: Boolean = principal.exists(_.role == "admin")
 
-  def becomeExpecting(tc: TableCommand): Unit = tc match {
-    case Update(table) => becomeExpecting(UpdateExpectation(table.id))
-    case Remove(id) => becomeExpecting(RemovalExpectation(id))
-    case _ =>
+  def becomeExpecting(tc: TableCommand): Unit =
+    if (mapping.isDefinedAt(tc)) {
+      val en = mapping(tc)
+      expectations += en -> (expectations(en) + 1)
+    }
+
+  def unbecomeExpecting(res: TableResult): Unit =
+    if (mapping.isDefinedAt(res)) {
+      val en = mapping(res)
+      if (expectations(en) == 1) expectations -= en
+      else expectations += en -> (expectations(en) - 1)
+    }
+
+  def isExpecting(res: TableResult): Boolean = {
+    mapping.isDefinedAt(res) &&
+      expectations(mapping(res)) > 0
   }
 
-  def unbecomeExpecting(res: TableResult): Unit = res match {
-    case UpdateFailed(id) => unbecomeExpecting(UpdateExpectation(id))
-    case RemovalFailed(id) => unbecomeExpecting(RemovalExpectation(id))
-    case Updated(table) => unbecomeExpecting(UpdateExpectation(table.id))
-    case Removed(id) => unbecomeExpecting(RemovalExpectation(id))
-    case _ =>
-  }
-
-  def isExpecting(res: TableResult): Boolean = res match {
-    case UpdateFailed(id) => expectations(UpdateExpectation(id)) > 0
-    case RemovalFailed(id) => expectations(RemovalExpectation(id)) > 0
-    case Updated(table) => expectations(UpdateExpectation(table.id)) > 0
-    case Removed(id) => expectations(RemovalExpectation(id)) > 0
-    case _ => false
-  }
-
-  private def becomeExpecting(en: Expectation): Unit = {
-    expectations += en -> (expectations(en) + 1)
-  }
-
-  private def unbecomeExpecting(en: Expectation): Unit = {
-    if (expectations(en) == 1) expectations -= en
-    else expectations += en -> (expectations(en) - 1)
+  private[this] val mapping: Mapping = {
+    case Update(table) => UpdateExpectation(table.id)
+    case Remove(id) => RemovalExpectation(id)
+    case UpdateFailed(id) => UpdateExpectation(id)
+    case RemovalFailed(id) => RemovalExpectation(id)
+    case Updated(table) => UpdateExpectation(table.id)
+    case Removed(id) => RemovalExpectation(id)
   }
 }
 
@@ -72,4 +70,3 @@ trait SimpleService extends Service {
     case (_, _) => None
   }
 }
-

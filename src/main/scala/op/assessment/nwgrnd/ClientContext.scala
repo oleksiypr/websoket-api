@@ -20,7 +20,8 @@ object ClientContext {
 
 class ClientContext {
 
-  private[this] var expectations = Map.empty[Expectation, Int].withDefaultValue(0)
+  private[this] var expectations =
+    Map.empty[Expectation, Int].withDefaultValue(0)
 
   @volatile var isSubscribed: Boolean = false
   @volatile var principal: Option[Principal] = None

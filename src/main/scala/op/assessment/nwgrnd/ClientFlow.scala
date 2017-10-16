@@ -35,20 +35,7 @@ final class ClientFlow private[nwgrnd] (security: Security)
           case Unsubscribe =>
             ctx.isSubscribed = false
             pull(in)
-          case te: TableEvent =>
-            ctx.unbecomeExpecting(te)
-            if (ctx.isSubscribed) push(out, te)
-            else pull(in)
-          case tc: TableCommand with ClientOut =>
-            ctx.becomeExpecting(tc)
-            if (ctx.isAuthorized) push(out, tc)
-            else push(out, NotAuthorized)
-          case rf: RemovalFailed if ctx.isExpecting(rf) =>
-            ctx.unbecomeExpecting(rf)
-            push(out, rf)
-          case uf: UpdateFailed if ctx.isExpecting(uf) =>
-            ctx.unbecomeExpecting(uf)
-            push(out, uf)
+          case tr: TableRelated => handle(tr)
           case _ => pull(in)
         }
       }
@@ -57,5 +44,24 @@ final class ClientFlow private[nwgrnd] (security: Security)
     setHandler(out, new OutHandler {
       def onPull(): Unit = pull(in)
     })
+
+    private def handle(tr: TableRelated): Unit = tr match {
+      case tc: TableCommand with ClientOut =>
+        ctx.becomeExpecting(tc)
+        if (ctx.isAuthorized) push(out, tc)
+        else push(out, NotAuthorized)
+      case te: TableEvent =>
+        ctx.unbecomeExpecting(te)
+        if (ctx.isSubscribed) push(out, te)
+        else pull(in)
+      case rf: RemovalFailed => handleFailed(rf)
+      case uf: UpdateFailed => handleFailed(uf)
+    }
+
+    private def handleFailed(failed: TableResult with ClientOut): Unit =
+      if (ctx.isExpecting(failed)) {
+        ctx.unbecomeExpecting(failed)
+        push(out, failed)
+      }
   }
 }

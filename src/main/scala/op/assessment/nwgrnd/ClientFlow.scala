@@ -35,10 +35,20 @@ final class ClientFlow private[nwgrnd] (security: Security)
           case Unsubscribe =>
             ctx.isSubscribed = false
             pull(in)
-          case te: TableEvent if ctx.isSubscribed => push(out, te)
+          case te: TableEvent =>
+            ctx.unbecomeExpecting(te)
+            if (ctx.isSubscribed) push(out, te)
+            else pull(in)
           case tc: TableCommand with ClientOut =>
+            ctx.becomeExpecting(tc)
             if (ctx.isAuthorized) push(out, tc)
             else push(out, NotAuthorized)
+          case rf: RemovalFailed if ctx.isExpecting(rf) =>
+            ctx.unbecomeExpecting(rf)
+            push(out, rf)
+          case uf: UpdateFailed if ctx.isExpecting(uf) =>
+            ctx.unbecomeExpecting(uf)
+            push(out, uf)
           case _ => pull(in)
         }
       }

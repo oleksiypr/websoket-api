@@ -24,20 +24,24 @@ object WsApi {
   case object Subscribe extends WsIn("subscribe_tables") with TableCommand with ClientOut
   case object Unsubscribe extends WsIn("unsubscribe_tables") with TableCommand
   case class Update(table: IdTable) extends WsIn("update_table") with TableCommand with ClientOut
-  case class Remove(id: String) extends WsIn("remove_table") with TableCommand with ClientOut
+  case class Remove(id: Int) extends WsIn("remove_table") with TableCommand with ClientOut
   case class Add(afterId: Int, table: Table) extends WsIn("add_table") with TableCommand with ClientOut
+
+  trait TableResult extends ClientIn
 
   sealed trait WsOut extends ClientOut
   case object LoginFailed extends WsOut
   case object NotAuthorized extends WsOut
   case class LoginSuccessful(userType: String) extends WsOut
   case class Pong(seq: Int) extends WsOut
+  case class UpdateFailed(id: Int) extends WsOut with TableResult
+  case class RemovalFailed(id: Int) extends WsOut with TableResult
 
-  sealed trait TableEvent extends WsOut with ClientIn
+  sealed trait TableEvent extends WsOut with TableResult
   case class Subscribed(tables: List[IdTable]) extends TableEvent
   case class Added(afterId: Int, table: IdTable) extends TableEvent
   case class Updated(table: IdTable) extends TableEvent
-  case class Removed(id: String) extends TableEvent
+  case class Removed(id: Int) extends TableEvent
 }
 
 trait WsApi extends JsonSupport { this: Service =>

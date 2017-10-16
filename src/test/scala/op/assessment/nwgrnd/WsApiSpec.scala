@@ -151,10 +151,7 @@ class WsApiSpec extends WordSpec with Matchers
           case Add(afterId, table) =>
             probe.send(
               source,
-              Added(
-                afterId,
-                IdTable(id = 3, table.name, table.participants)
-              )
+              Added(afterId, IdTable(id = 3, table.name, table.participants))
             )
             TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
@@ -194,6 +191,57 @@ class WsApiSpec extends WordSpec with Matchers
           Table(name = "table -James Bond", participants = 7)
         )
       )
+
+      wsClient.sendCompletion()
+      system.stop(source)
+      wsClient.expectCompletion()
+    }
+  }
+
+  "WsApi commands failed" in new WsApi with SimpleService {
+    implicit val system: ActorSystem = self.system
+    implicit val materializer: ActorMaterializer = self.materializer
+
+    val probe = TestProbe()
+    val tablesRepo: ActorRef = probe.ref
+    val wsClient = WSProbe()
+
+    WS("/ws-api", wsClient.flow) ~> route ~> check {
+      isWebSocketUpgrade shouldEqual true
+      val source: ActorRef = probe.expectMsgPF() {
+        case ('income, source: ActorRef) => source
+      }
+      probe.setAutoPilot(
+        (_: ActorRef, msg: Any) => msg match {
+          case Update(table) =>
+            probe.send(source, UpdateFailed(table.id)); TestActor.KeepRunning
+          case Remove(id) =>
+            probe.send(source, RemovalFailed(id)); TestActor.KeepRunning
+          case 'sinkclose => TestActor.NoAutoPilot
+          case _ => TestActor.KeepRunning
+        }
+      )
+      adminLoginSucceed(wsClient)
+
+      wsClient.sendMessage(
+        """{
+         |  "$type": "update_table",
+         |  "table": {
+         |    "id": 3,
+         |    "name": "table -Foo Fighters",
+         |    "participants": 4
+         |  }
+         |}""".stripMargin
+      )
+      wsClient.expectJsonStr("""{"$type": "update_failed","id": 3}""")
+
+      wsClient.sendMessage(
+        """{
+         |  "$type": "remove_table",
+         |  "id": 3
+         |}""".stripMargin
+      )
+      wsClient.expectJsonStr("""{"$type": "removal_failed","id": 3}""")
 
       wsClient.sendCompletion()
       system.stop(source)

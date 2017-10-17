@@ -1,6 +1,6 @@
 package op.assessment.nwgrnd.repo
 
-import akka.actor.{ ActorSystem, Props }
+import akka.actor.{ ActorRef, ActorSystem, Props }
 import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
 import op.assessment.nwgrnd.ws.WsApi._
 import org.scalatest.{ BeforeAndAfterAll, Matchers, WordSpecLike }
@@ -40,21 +40,39 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
       val sourceProbe = TestProbe()
       tablesRepo ! ('income → sourceProbe.ref)
 
-      tablesRepo ! Add(
-        afterId = -1,
-        Table(name = "table - Foo Fighters", participants = 4)
-      )
-      sourceProbe.expectMsg(Added(
-        afterId = -1,
-        IdTable(id = 0, name = "table - Foo Fighters", participants = 4)
-      ))
+      addTable(tablesRepo, afterId = -1, "A")
+      addTable(tablesRepo, afterId = -1, "B")
+      addTable(tablesRepo, afterId = -1, "C")
+
+      expectAdded(sourceProbe, afterId = -1, 0, "A")
+      expectAdded(sourceProbe, afterId = -1, 0, "B")
+      expectAdded(sourceProbe, afterId = -1, 0, "C")
 
       tablesRepo ! Subscribe
       sourceProbe.expectMsg(
         Subscribed(List(
-          IdTable(id = 0, name = "table - Foo Fighters", participants = 4)
+          IdTable(id = 0, name = "C", participants = 2),
+          IdTable(id = 1, name = "B", participants = 2),
+          IdTable(id = 2, name = "A", participants = 2)
         ))
       )
     }
+  }
+
+  private def expectAdded(
+    sourceProbe: TestProbe,
+    afterId: Int,
+    id: Int,
+    name: String
+  ): Any = {
+    sourceProbe.expectMsg(Added(
+      afterId, IdTable(id, name, participants = 2)
+    ))
+  }
+
+  private def addTable(
+    tablesRepo: ActorRef, afterId: Int, name: String
+  ): Unit = {
+    tablesRepo ! Add(afterId, Table(name = name, participants = 2))
   }
 }

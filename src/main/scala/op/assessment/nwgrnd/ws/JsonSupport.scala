@@ -1,8 +1,8 @@
-package op.assessment.nwgrnd
+package op.assessment.nwgrnd.ws
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.stream.Materializer
-import op.assessment.nwgrnd.WsApi._
+import op.assessment.nwgrnd.ws.WsApi._
 import spray.json._
 
 trait JsonSupport extends SprayJsonSupport {

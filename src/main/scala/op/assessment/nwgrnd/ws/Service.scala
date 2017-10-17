@@ -1,6 +1,6 @@
-package op.assessment.nwgrnd
+package op.assessment.nwgrnd.ws
 
-import op.assessment.nwgrnd.Security.{ Admin, Principal, User }
+import op.assessment.nwgrnd.ws.Security._
 
 trait Service {
   val security: Security

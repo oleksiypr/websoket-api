@@ -1,4 +1,4 @@
-package op.assessment.nwgrnd
+package op.assessment.nwgrnd.ws
 
 import akka.NotUsed
 import akka.actor.{ ActorRef, ActorSystem }
@@ -6,7 +6,8 @@ import akka.http.scaladsl.model.ws.{ Message, TextMessage }
 import akka.http.scaladsl.server.Route
 import akka.stream._
 import akka.stream.scaladsl.{ Flow, Sink, Source }
-import op.assessment.nwgrnd.WsApi.{ ClientOut, TableCommand, WsOut }
+import op.assessment.nwgrnd.ws.WsApi._
+
 import scala.concurrent.Future
 
 object WsApi {
@@ -79,7 +80,7 @@ trait WsApi extends JsonSupport { this: Service =>
         sourceActor
       }
 
-  private def clientFlow = new ClientFlow(security)
+  private def clientFlow = new WsFlow(security)
 
   private def clientHandler = Flow[Message]
     .collect {

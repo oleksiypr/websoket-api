@@ -4,7 +4,7 @@ lazy val akkaVersion    = "2.5.4"
 lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
-      organization    := "op.assignmetnt",
+      organization    := "op.assignmetnt.nwgrnd",
       scalaVersion    := "2.12.3"
     )),
     name := "websoсket-api",

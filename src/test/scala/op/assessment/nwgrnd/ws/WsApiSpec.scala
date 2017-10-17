@@ -1,4 +1,4 @@
-package op.assessment.nwgrnd
+package op.assessment.nwgrnd.ws
 
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.model.ws.TextMessage
@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{ ScalatestRouteTest, WSProbe }
 import akka.stream.ActorMaterializer
 import akka.testkit.{ TestActor, TestProbe }
-import op.assessment.nwgrnd.WsApi._
+import op.assessment.nwgrnd.ws.WsApi._
 import org.scalatest.{ Matchers, WordSpec }
 import spray.json._
 

@@ -1,10 +1,10 @@
-package op.assessment.nwgrnd
+package op.assessment.nwgrnd.ws
 
-import akka.stream.{ Attributes, FlowShape, Inlet, Outlet }
 import akka.stream.stage.{ GraphStage, GraphStageLogic, InHandler, OutHandler }
-import op.assessment.nwgrnd.WsApi._
+import akka.stream.{ Attributes, FlowShape, Inlet, Outlet }
+import op.assessment.nwgrnd.ws.WsApi._
 
-final class ClientFlow private[nwgrnd] (security: Security)
+final class WsFlow private[ws] (security: Security)
     extends GraphStage[FlowShape[ClientIn, ClientOut]] {
 
   private[this] val in = Inlet[ClientIn]("ClientFlow.in")
@@ -58,10 +58,11 @@ final class ClientFlow private[nwgrnd] (security: Security)
       case uf: UpdateFailed => handleFailed(uf)
     }
 
-    private def handleFailed(failed: TableResult with ClientOut): Unit =
-      if (ctx.isExpecting(failed)) {
-        ctx.unbecomeExpecting(failed)
-        push(out, failed)
-      }
+    private def handleFailed(
+      failed: TableResult with ClientOut
+    ): Unit = if (ctx.isExpecting(failed)) {
+      ctx.unbecomeExpecting(failed)
+      push(out, failed)
+    }
   }
 }

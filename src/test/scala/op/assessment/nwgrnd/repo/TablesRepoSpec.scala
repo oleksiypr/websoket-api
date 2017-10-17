@@ -56,6 +56,9 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
           IdTable(id = 2, name = "A", participants = 2)
         ))
       )
+
+      addTable(tablesRepo, afterId = 1, "D")
+      expectAdded(sourceProbe, afterId = 1, 2, "D")
     }
   }
 

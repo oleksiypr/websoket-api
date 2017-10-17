@@ -10,7 +10,7 @@ private[repo] case class TablesState(
     cmd match {
       case Subscribe => (Subscribed(indexed.toList), this)
       case Add(afterId, t) =>
-        val (fore, aft) = tables.splitAt(afterId)
+        val (fore, aft) = tables.splitAt(afterId + 1)
         val id = fore.size
         val table = Table(t.name, t.participants)
         val res = IdTable(id, t.name, t.participants)

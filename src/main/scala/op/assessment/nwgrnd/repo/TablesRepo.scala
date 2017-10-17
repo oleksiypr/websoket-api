@@ -1,11 +1,11 @@
 package op.assessment.nwgrnd.repo
 
 import akka.actor.{ Actor, ActorRef, Terminated }
-import op.assessment.nwgrnd.ws.WsApi.{ Subscribe, Subscribed, Table }
+import op.assessment.nwgrnd.ws.WsApi._
 
 class TablesRepo extends Actor {
 
-  private[this] var tables = Vector.empty[Table]
+  private[this] var tables = Vector.empty[IdTable]
   private[this] var source = Option.empty[ActorRef]
 
   override def preStart(): Unit = {
@@ -25,11 +25,16 @@ class TablesRepo extends Actor {
   }
 
   val receive: Receive = {
-    case Subscribe => source.foreach(_ ! Subscribed(Nil))
-
+    case Subscribe => sendToSource(Subscribed(tables.toList))
+    case Add(afterId, t) =>
+      val table = IdTable(0, t.name, t.participants)
+      tables = table +: tables
+      sendToSource(Added(afterId, table))
     case 'sinkclose ⇒ context.stop(self)
     case Terminated(a) if source.contains(a) =>
       source = None
       context.stop(self)
   }
+
+  private def sendToSource(res: TableResult): Unit = source.foreach(_ ! res)
 }

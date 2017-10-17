@@ -2,7 +2,7 @@ package op.assessment.nwgrnd.repo
 
 import akka.actor.{ ActorSystem, Props }
 import akka.testkit.{ ImplicitSender, TestKit, TestProbe }
-import op.assessment.nwgrnd.ws.WsApi.{ Subscribe, Subscribed }
+import op.assessment.nwgrnd.ws.WsApi._
 import org.scalatest.{ BeforeAndAfterAll, Matchers, WordSpecLike }
 
 class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
@@ -34,6 +34,27 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
 
       expectTerminated(sourceProbe.ref)
       expectTerminated(tablesRepo)
+    }
+    "operate tables" in {
+      val tablesRepo = watch(system.actorOf(Props[TablesRepo]))
+      val sourceProbe = TestProbe()
+      tablesRepo ! ('income → sourceProbe.ref)
+
+      tablesRepo ! Add(
+        afterId = -1,
+        Table(name = "table - Foo Fighters", participants = 4)
+      )
+      sourceProbe.expectMsg(Added(
+        afterId = -1,
+        IdTable(id = 0, name = "table - Foo Fighters", participants = 4)
+      ))
+
+      tablesRepo ! Subscribe
+      sourceProbe.expectMsg(
+        Subscribed(List(
+          IdTable(id = 0, name = "table - Foo Fighters", participants = 4)
+        ))
+      )
     }
   }
 }

@@ -25,7 +25,6 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
       expectMsg('not_ready)
 
       tablesRepo ! ('income → sourceProbe.ref)
-      sourceProbe.expectNoMsg()
 
       tablesRepo ! Subscribe
       sourceProbe.expectMsg(Subscribed(Nil))
@@ -35,7 +34,7 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
       expectTerminated(sourceProbe.ref)
       expectTerminated(tablesRepo)
     }
-    "operate tables" in {
+    "operate add tables" in {
       val tablesRepo = watch(system.actorOf(Props[TablesRepo]))
       val sourceProbe = TestProbe()
       tablesRepo ! ('income → sourceProbe.ref)
@@ -59,6 +58,38 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
 
       addTable(tablesRepo, afterId = 1, "D")
       expectAdded(sourceProbe, afterId = 1, 2, "D")
+    }
+
+    "operate update and remove tables" in {
+      val tablesRepo = watch(system.actorOf(Props[TablesRepo]))
+      val sourceProbe = TestProbe()
+      tablesRepo ! ('income → sourceProbe.ref)
+
+      tablesRepo ! Update(
+        IdTable(id = 0, "A", participants = 2)
+      )
+      sourceProbe.expectMsg(UpdateFailed(id = 0))
+
+      tablesRepo ! Remove(id = 0)
+      sourceProbe.expectMsg(RemovalFailed(id = 0))
+
+      addTable(tablesRepo, afterId = -1, "A")
+      expectAdded(sourceProbe, afterId = -1, 0, "A")
+      tablesRepo ! Update(
+        IdTable(id = 0, "B", participants = 2)
+      )
+      sourceProbe.expectMsg(Updated(IdTable(id = 0, "B", participants = 2)))
+
+      tablesRepo ! Subscribe
+      sourceProbe.expectMsg(
+        Subscribed(List(IdTable(id = 0, name = "B", participants = 2)))
+      )
+
+      tablesRepo ! Remove(id = 0)
+      sourceProbe.expectMsg(Removed(id = 0))
+
+      tablesRepo ! Subscribe
+      sourceProbe.expectMsg(Subscribed(Nil))
     }
   }
 

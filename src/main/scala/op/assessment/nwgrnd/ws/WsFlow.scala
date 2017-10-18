@@ -20,22 +20,19 @@ final class WsFlow private[ws] (security: Security)
     setHandler(in, new InHandler {
       def onPush(): Unit = {
         grab(in) match {
-          case Login(name, pass) =>
-            security.auth(name, pass) match {
-              case p @ Some(principal) =>
-                ctx.principal = p
-                push(out, LoginSuccessful(principal.role))
-              case None => push(out, LoginFailed)
-            }
+          case Login(name, pass) => login(name, pass)
           case _ if ctx.principal.isEmpty => pull(in)
           case Ping(seq) => push(out, Pong(seq))
+
           case Subscribe =>
             ctx.isSubscribed = true
             push(out, Subscribe)
+
           case Unsubscribe =>
             ctx.isSubscribed = false
             pull(in)
           case tr: TableRelated => handle(tr)
+
           case _ => pull(in)
         }
       }
@@ -44,6 +41,15 @@ final class WsFlow private[ws] (security: Security)
     setHandler(out, new OutHandler {
       def onPull(): Unit = pull(in)
     })
+
+    private def login(name: String, pass: String): Unit = {
+      security.auth(name, pass) match {
+        case p @ Some(principal) =>
+          ctx.principal = p
+          push(out, LoginSuccessful(principal.role))
+        case None => push(out, LoginFailed)
+      }
+    }
 
     private def handle(tr: TableRelated): Unit = tr match {
       case tc: TableCommand with ClientOut =>

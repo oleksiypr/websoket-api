@@ -42,10 +42,7 @@ class WsApiSpec extends WordSpec with Matchers
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
-
-      val source = probe.expectMsgPF() {
-        case ('income, source: ActorRef) => source
-      }
+      val subscriber = expectSubscriber(probe)
 
       loginFailed(wsClient)
 
@@ -58,7 +55,7 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.expectJsonStr("""{"$type": "pong", "seq": 1}""")
 
       wsClient.sendCompletion()
-      system.stop(source)
+      system.stop(subscriber)
       wsClient.expectCompletion()
     }
   }
@@ -73,18 +70,15 @@ class WsApiSpec extends WordSpec with Matchers
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
-
-      val source: ActorRef = probe.expectMsgPF() {
-        case ('income, source: ActorRef) => source
-      }
+      val subscriber: ActorRef = expectSubscriber(probe)
       probe.setAutoPilot(
         (_: ActorRef, msg: Any) => msg match {
           case Subscribe =>
-            probe.send(source, Subscribed(
+            probe.send(subscriber, Subscribed(
               List(IdTable(id = 1, "table -James Bond", 7))
             )); TestActor.KeepRunning
           case Update(table) =>
-            probe.send(source, Updated(table)); TestActor.KeepRunning
+            probe.send(subscriber, Updated(table)); TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case _ => TestActor.KeepRunning
         }
@@ -128,7 +122,7 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.expectJsonStr("""{"$type": "pong", "seq": 1}""")
 
       wsClient.sendCompletion()
-      system.stop(source)
+      system.stop(subscriber)
       wsClient.expectCompletion()
     }
   }
@@ -143,14 +137,12 @@ class WsApiSpec extends WordSpec with Matchers
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
-      val source: ActorRef = probe.expectMsgPF() {
-        case ('income, source: ActorRef) => source
-      }
+      val subscriber: ActorRef = expectSubscriber(probe)
       probe.setAutoPilot(
         (_: ActorRef, msg: Any) => msg match {
           case Add(afterId, table) =>
             probe.send(
-              source,
+              subscriber,
               Added(afterId, IdTable(id = 3, table.name, table.participants))
             )
             TestActor.KeepRunning
@@ -193,7 +185,7 @@ class WsApiSpec extends WordSpec with Matchers
       )
 
       wsClient.sendCompletion()
-      system.stop(source)
+      system.stop(subscriber)
       wsClient.expectCompletion()
     }
   }
@@ -208,15 +200,13 @@ class WsApiSpec extends WordSpec with Matchers
 
     WS("/ws-api", wsClient.flow) ~> route ~> check {
       isWebSocketUpgrade shouldEqual true
-      val source: ActorRef = probe.expectMsgPF() {
-        case ('income, source: ActorRef) => source
-      }
+      val subscriber: ActorRef = expectSubscriber(probe)
       probe.setAutoPilot(
         (_: ActorRef, msg: Any) => msg match {
           case Update(table) =>
-            probe.send(source, UpdateFailed(table.id)); TestActor.KeepRunning
+            probe.send(subscriber, UpdateFailed(table.id)); TestActor.KeepRunning
           case Remove(id) =>
-            probe.send(source, RemovalFailed(id)); TestActor.KeepRunning
+            probe.send(subscriber, RemovalFailed(id)); TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case _ => TestActor.KeepRunning
         }
@@ -244,8 +234,14 @@ class WsApiSpec extends WordSpec with Matchers
       wsClient.expectJsonStr("""{"$type": "removal_failed","id": 3}""")
 
       wsClient.sendCompletion()
-      system.stop(source)
+      system.stop(subscriber)
       wsClient.expectCompletion()
+    }
+  }
+
+  private def expectSubscriber(probe: TestProbe) = {
+    probe.expectMsgPF() {
+      case ('income, a: ActorRef) => a
     }
   }
 

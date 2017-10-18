@@ -21,9 +21,6 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
       val sourceProbe = TestProbe()
       watch(sourceProbe.ref)
 
-      tablesRepo ! Subscribe
-      expectMsg('not_ready)
-
       tablesRepo ! ('income → sourceProbe.ref)
 
       tablesRepo ! Subscribe

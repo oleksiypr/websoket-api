@@ -6,36 +6,29 @@ import op.assessment.nwgrnd.ws.WsApi._
 class TablesRepo extends Actor {
 
   private[this] var tablesState = TablesState()
-  private[this] var source = Option.empty[ActorRef]
-
-  override def preStart(): Unit = {
-    context.become(awaiting)
-  }
+  private[this] var subscribers = Set.empty[ActorRef]
 
   override def postStop(): Unit = {
-    source.foreach(context.stop)
-  }
-
-  def awaiting: Receive = {
-    case ('income, a: ActorRef) ⇒
-      source = Some(a)
-      context.watch(a)
-      context become receive
-    case _ => sender ! 'not_ready
+    subscribers.foreach(context.stop)
   }
 
   val receive: Receive = {
+    case ('income, a: ActorRef) ⇒
+      subscribers += context.watch(a)
+
     case cmd: TableCommand =>
       val (res, newState) = tablesState(cmd)
-      sendToSource(res)
+      publish(res)
       tablesState = newState
-    case 'sinkclose ⇒ context.stop(self)
-    case Terminated(a) if source.contains(a) =>
-      source = None
+
+    case 'sinkclose ⇒
       context.stop(self)
+
+    case Terminated(a) =>
+      subscribers -= a
   }
 
-  private def sendToSource(res: TableResult) {
-    source.foreach(_ ! res)
+  private def publish(res: TableResult) {
+    subscribers.foreach(_ ! res)
   }
 }

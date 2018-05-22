@@ -27,7 +27,7 @@ object WsApiSpec {
 }
 
 class WsApiSpec extends WordSpec with Matchers
-    with Directives with ScalatestRouteTest { self =>
+  with Directives with ScalatestRouteTest { self =>
 
   import WsApiSpec._
   implicit val matchers: Matchers = this
@@ -75,14 +75,12 @@ class WsApiSpec extends WordSpec with Matchers
         (_: ActorRef, msg: Any) => msg match {
           case Subscribe =>
             probe.send(subscriber, Subscribed(
-              List(IdTable(id = 1, "table -James Bond", 7))
-            )); TestActor.KeepRunning
+              List(IdTable(id = 1, "table -James Bond", 7)))); TestActor.KeepRunning
           case Update(table) =>
             probe.send(subscriber, Updated(table)); TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case _ => TestActor.KeepRunning
-        }
-      )
+        })
 
       userLoginSucceed(wsClient)
 
@@ -97,8 +95,7 @@ class WsApiSpec extends WordSpec with Matchers
           |     "participants": 7
           |   }
           | ]
-          |}"""
-      )
+          |}""")
 
       tablesRepo ! Update(IdTable(id = 1, "table -James Bond", 7))
 
@@ -110,8 +107,7 @@ class WsApiSpec extends WordSpec with Matchers
           |   "name": "table -James Bond",
           |   "participants": 7
           | }
-          |}""".stripMargin
-      )
+          |}""".stripMargin)
 
       wsClient.sendMessage("""{"$type": "unsubscribe_tables"}""")
       wsClient.expectNoMessage()
@@ -143,13 +139,11 @@ class WsApiSpec extends WordSpec with Matchers
           case Add(afterId, table) =>
             probe.send(
               subscriber,
-              Added(afterId, IdTable(id = 3, table.name, table.participants))
-            )
+              Added(afterId, IdTable(id = 3, table.name, table.participants)))
             TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case _ => TestActor.KeepRunning
-        }
-      )
+        })
 
       userLoginSucceed(wsClient)
 
@@ -161,8 +155,7 @@ class WsApiSpec extends WordSpec with Matchers
           |   "name": "table -James Bond",
           |   "participants": 7
           | }
-          |}""".stripMargin
-      )
+          |}""".stripMargin)
       wsClient.expectJsonStr("""{"$type": "not_authorized"}""")
 
       adminLoginSucceed(wsClient)
@@ -175,14 +168,11 @@ class WsApiSpec extends WordSpec with Matchers
           |   "name": "table -James Bond",
           |   "participants": 7
           | }
-          |}""".stripMargin
-      )
+          |}""".stripMargin)
       probe.expectMsg(
         Add(
           afterId = 1,
-          Table(name = "table -James Bond", participants = 7)
-        )
-      )
+          Table(name = "table -James Bond", participants = 7)))
 
       wsClient.sendCompletion()
       system.stop(subscriber)
@@ -209,8 +199,7 @@ class WsApiSpec extends WordSpec with Matchers
             probe.send(subscriber, RemovalFailed(id)); TestActor.KeepRunning
           case 'sinkclose => TestActor.NoAutoPilot
           case _ => TestActor.KeepRunning
-        }
-      )
+        })
       adminLoginSucceed(wsClient)
 
       wsClient.sendMessage(
@@ -221,16 +210,14 @@ class WsApiSpec extends WordSpec with Matchers
          |    "name": "table -Foo Fighters",
          |    "participants": 4
          |  }
-         |}""".stripMargin
-      )
+         |}""".stripMargin)
       wsClient.expectJsonStr("""{"$type": "update_failed","id": 3}""")
 
       wsClient.sendMessage(
         """{
          |  "$type": "remove_table",
          |  "id": 3
-         |}""".stripMargin
-      )
+         |}""".stripMargin)
       wsClient.expectJsonStr("""{"$type": "removal_failed","id": 3}""")
 
       wsClient.sendCompletion()
@@ -252,11 +239,9 @@ class WsApiSpec extends WordSpec with Matchers
         | "username":"user1234",
         | "password":"password12345"
         |}""".
-      stripMargin
-    )
+        stripMargin)
     wsClient.expectJsonStr(
-      """{"$type":"login_failed"}"""
-    )
+      """{"$type":"login_failed"}""")
   }
 
   private def userLoginSucceed(wsClient: WSProbe): Unit = {
@@ -265,11 +250,9 @@ class WsApiSpec extends WordSpec with Matchers
           | "$type":"login",
           | "username":"user",
           | "password":"password-user"
-          }""".stripMargin
-    )
+          }""".stripMargin)
     wsClient.expectJsonStr(
-      """{"$type": "login_successful", "user_type": "user"}"""
-    )
+      """{"$type": "login_successful", "user_type": "user"}""")
   }
 
   private def adminLoginSucceed(wsClient: WSProbe): Unit = {
@@ -278,10 +261,8 @@ class WsApiSpec extends WordSpec with Matchers
           | "$type":"login",
           | "username":"admin",
           | "password":"password-admin"
-          }""".stripMargin
-    )
+          }""".stripMargin)
     wsClient.expectJsonStr(
-      """{"$type": "login_successful", "user_type": "admin"}"""
-    )
+      """{"$type": "login_successful", "user_type": "admin"}""")
   }
 }

@@ -6,7 +6,7 @@ import op.assessment.nwgrnd.ws.WsApi._
 import org.scalatest.{ BeforeAndAfterAll, Matchers, WordSpecLike }
 
 class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
-    with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
+  with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   def this() = this(ActorSystem("TablesRepoSpec"))
 
@@ -49,9 +49,7 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
         Subscribed(List(
           IdTable(id = 0, name = "C", participants = 2),
           IdTable(id = 1, name = "B", participants = 2),
-          IdTable(id = 2, name = "A", participants = 2)
-        ))
-      )
+          IdTable(id = 2, name = "A", participants = 2))))
 
       addTable(tablesRepo, afterId = 1, "D")
       expectAdded(sourceProbe, afterId = 1, 2, "D")
@@ -63,8 +61,7 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
       tablesRepo ! ('income → sourceProbe.ref)
 
       tablesRepo ! Update(
-        IdTable(id = 0, "A", participants = 2)
-      )
+        IdTable(id = 0, "A", participants = 2))
       sourceProbe.expectMsg(UpdateFailed(id = 0))
 
       tablesRepo ! Remove(id = 0)
@@ -73,14 +70,12 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
       addTable(tablesRepo, afterId = -1, "A")
       expectAdded(sourceProbe, afterId = -1, 0, "A")
       tablesRepo ! Update(
-        IdTable(id = 0, "B", participants = 2)
-      )
+        IdTable(id = 0, "B", participants = 2))
       sourceProbe.expectMsg(Updated(IdTable(id = 0, "B", participants = 2)))
 
       tablesRepo ! Subscribe
       sourceProbe.expectMsg(
-        Subscribed(List(IdTable(id = 0, name = "B", participants = 2)))
-      )
+        Subscribed(List(IdTable(id = 0, name = "B", participants = 2))))
 
       tablesRepo ! Remove(id = 0)
       sourceProbe.expectMsg(Removed(id = 0))
@@ -94,16 +89,13 @@ class TablesRepoSpec(_system: ActorSystem) extends TestKit(_system)
     sourceProbe: TestProbe,
     afterId: Int,
     id: Int,
-    name: String
-  ): Any = {
+    name: String): Any = {
     sourceProbe.expectMsg(Added(
-      afterId, IdTable(id, name, participants = 2)
-    ))
+      afterId, IdTable(id, name, participants = 2)))
   }
 
   private def addTable(
-    tablesRepo: ActorRef, afterId: Int, name: String
-  ): Unit = {
+    tablesRepo: ActorRef, afterId: Int, name: String): Unit = {
     tablesRepo ! Add(afterId, Table(name = name, participants = 2))
   }
 }

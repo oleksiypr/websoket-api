@@ -5,15 +5,14 @@ import akka.stream.{ Attributes, FlowShape, Inlet, Outlet }
 import op.assessment.nwgrnd.ws.WsApi._
 
 final class WsFlow private[ws] (security: Security)
-    extends GraphStage[FlowShape[ClientIn, ClientOut]] {
+  extends GraphStage[FlowShape[ClientIn, ClientOut]] {
 
   private[this] val in = Inlet[ClientIn]("ClientFlow.in")
   private[this] val out = Outlet[ClientOut]("ClientFlow.out")
   val shape: FlowShape[ClientIn, ClientOut] = FlowShape.of(in, out)
 
   def createLogic(
-    inheritedAttributes: Attributes
-  ): GraphStageLogic = new GraphStageLogic(shape) {
+    inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
 
     private[this] val ctx = new ClientContext
 
@@ -65,10 +64,10 @@ final class WsFlow private[ws] (security: Security)
     }
 
     private def handleFailed(
-      failed: TableResult with ClientOut
-    ): Unit = if (ctx.isExpecting(failed)) {
-      ctx.unbecomeExpecting(failed)
-      push(out, failed)
-    }
+      failed: TableResult with ClientOut): Unit =
+      if (ctx.isExpecting(failed)) {
+        ctx.unbecomeExpecting(failed)
+        push(out, failed)
+      }
   }
 }

@@ -62,7 +62,6 @@ trait JsonSupport extends SprayJsonSupport {
   def marshal[T <: WsOut: JsonWriter](out: T, $type: String): String = {
     JsObject(
       JsObject("$type" -> JsString($type)).fields ++
-        out.toJson.asJsObject.fields
-    ).compactPrint
+        out.toJson.asJsObject.fields).compactPrint
   }
 }
